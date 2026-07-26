@@ -40,10 +40,12 @@ test("server-renders the WorldByCode studio", async () => {
     html,
     /<title>Image to executable physics world · WorldByCode<\/title>/i,
   );
-  assert.match(html, /From one image to a world that survives/);
+  assert.match(html, /One photo\. A world that survives/);
   assert.match(html, /zero 3d generators/i);
-  assert.match(html, /Build this world/);
+  assert.match(html, /Verifying physics/);
   assert.match(html, /WorldSpec/);
+  assert.match(html, /Physics report/);
+  assert.match(html, /VLM prompt/);
   assert.match(html, /Three\.js \+ Rapier/);
 });
 
@@ -60,4 +62,22 @@ test("ships the generated social card and no starter preview", async () => {
   assert.match(page, /<WorldStudio \/>/);
   assert.match(packageJson, /"name": "worldbycode"/);
   await assert.rejects(access(new URL("app/_sites-preview", templateRoot)));
+});
+
+test("ships an inspectable WorldSpec contract and real model route", async () => {
+  const [worldSpecSource, promptSource, routeSource, envExample] =
+    await Promise.all([
+      readFile(new URL("../lib/worldspec.ts", import.meta.url), "utf8"),
+      readFile(new URL("../lib/world-prompt.ts", import.meta.url), "utf8"),
+      readFile(new URL("../app/api/world/route.ts", import.meta.url), "utf8"),
+      readFile(new URL("../.env.example", import.meta.url), "utf8"),
+    ]);
+
+  assert.match(worldSpecSource, /WORLD_SPEC_JSON_SCHEMA/);
+  assert.match(worldSpecSource, /validateWorldSpec/);
+  assert.match(promptSource, /Real2Sim scene compiler/);
+  assert.match(routeSource, /api\.openai\.com\/v1\/responses/);
+  assert.match(routeSource, /type: "json_schema"/);
+  assert.match(routeSource, /detail: "original"/);
+  assert.match(envExample, /OPENAI_API_KEY=/);
 });

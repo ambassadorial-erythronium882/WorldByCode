@@ -140,6 +140,11 @@ button {
   box-shadow: 0 0 0 3px rgba(32, 186, 107, 0.12);
 }
 
+.mini-chip:not(.live-chip) .dot {
+  background: #e0a426;
+  box-shadow: 0 0 0 3px rgba(224, 164, 38, 0.14);
+}
+
 .studio {
   display: grid;
   min-height: calc(100vh - 90px);
@@ -354,6 +359,11 @@ h1 {
   transform: translateY(-1px);
 }
 
+.icon-button {
+  color: inherit;
+  text-decoration: none;
+}
+
 .icon-button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
@@ -382,12 +392,31 @@ h1 {
 }
 
 .main-button:disabled {
-  cursor: wait;
+  cursor: not-allowed;
   opacity: 0.75;
 }
 
 .main-button svg {
   color: var(--acid);
+}
+
+.error-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: 16px;
+  border: 1px solid rgba(167, 66, 42, 0.36);
+  border-radius: 10px;
+  background: rgba(255, 106, 74, 0.09);
+  padding: 10px 11px;
+  color: #7f3827;
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.error-banner svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
 }
 
 .pipeline {
@@ -489,13 +518,87 @@ h1 {
   background: #d9d7cd;
 }
 
-.canvas-wrap {
+.comparison-stage {
   position: absolute;
   inset: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  background: #d9d7cd;
 }
 
-.canvas-wrap canvas {
+.comparison-stage.split {
+  grid-template-columns: minmax(210px, 34%) minmax(0, 66%);
+}
+
+.reference-pane,
+.scene-pane {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.reference-pane {
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  border-right: 1px solid rgba(23, 23, 17, 0.22);
+  background:
+    linear-gradient(45deg, rgba(255, 255, 255, 0.035) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(255, 255, 255, 0.035) 25%, transparent 25%),
+    #1f201d;
+  background-position: 0 0, 9px 9px;
+  background-size: 18px 18px;
+}
+
+.reference-pane img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.scene-pane canvas {
   touch-action: none;
+}
+
+.pane-label {
+  position: absolute;
+  z-index: 3;
+  right: 10px;
+  bottom: 181px;
+  left: 10px;
+  width: fit-content;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+  background: rgba(23, 23, 17, 0.72);
+  padding: 5px 8px;
+  color: rgba(255, 255, 255, 0.82);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 7px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  backdrop-filter: blur(10px);
+}
+
+.live-pane-label {
+  left: auto;
+}
+
+.stale-scene-banner {
+  position: absolute;
+  z-index: 4;
+  top: 74px;
+  left: 50%;
+  max-width: 330px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(23, 23, 17, 0.22);
+  border-radius: 9px;
+  background: rgba(255, 244, 207, 0.9);
+  padding: 8px 11px;
+  color: #62501e;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 8px;
+  text-align: center;
+  backdrop-filter: blur(12px);
 }
 
 .viewport-header {
@@ -530,6 +633,10 @@ h1 {
   height: 6px;
   border-radius: 50%;
   background: #1bb56a;
+}
+
+.live-dot.warning {
+  background: #e0a426;
 }
 
 .viewport-tools {
@@ -608,10 +715,14 @@ h1 {
 
 .score-bar span {
   display: block;
-  width: 96%;
   height: 100%;
   border-radius: inherit;
   background: #1eae68;
+  transition: width 420ms ease;
+}
+
+.score-card.warning .score-bar span {
+  background: #e0a426;
 }
 
 .score-checks {
@@ -630,6 +741,10 @@ h1 {
 
 .score-checks svg {
   color: #13804a;
+}
+
+.score-card.warning .score-checks svg {
+  color: #b07817;
 }
 
 .code-dock {
@@ -817,6 +932,10 @@ pre {
   .workspace {
     min-height: 720px;
   }
+
+  .comparison-stage.split {
+    grid-template-columns: minmax(190px, 32%) minmax(0, 68%);
+  }
 }
 
 @media (max-width: 620px) {
@@ -854,6 +973,32 @@ pre {
 
   .workspace {
     min-height: 660px;
+  }
+
+  .comparison-stage.split {
+    grid-template-columns: 1fr;
+  }
+
+  .comparison-stage.split .reference-pane {
+    position: absolute;
+    z-index: 2;
+    top: 66px;
+    left: 10px;
+    width: 128px;
+    height: 168px;
+    border: 1px solid rgba(23, 23, 17, 0.2);
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(23, 23, 17, 0.18);
+  }
+
+  .reference-pane .pane-label {
+    right: 6px;
+    bottom: 6px;
+    left: 6px;
+    max-width: calc(100% - 12px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .score-card {
