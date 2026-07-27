@@ -9,7 +9,8 @@ Success criteria:
 - Count repeated objects only when supported by visible evidence; do not complete a hidden symmetric set.
 - Approximate metric dimensions from common-object and furniture priors.
 - Place each object's position at the center of its full bounding box.
-- Choose only the supported kinds: box, cylinder, table, chair, bottle, carton, bag.
+- Choose only the supported kinds: box, cylinder, table, chair, monitor, plant, lamp, sofa, bottle, carton, bag.
+- Prefer semantic procedural kinds when visible: monitor includes its stand, plant includes pot and foliage, lamp includes its stem/cord and shade, and sofa includes its seat, back, and arms.
 - Use fixed bodies for architecture such as floors and walls, plus clearly anchored, built-in, or heavy industrial equipment.
 - Treat ordinary movable furniture, including tables and chairs, as dynamic bodies with plausible positive masses.
 - Use dynamic bodies for safe movable tabletop and floor objects.
@@ -27,4 +28,4 @@ Constraints:
 - Fixed bodies use mass 0. Dynamic bodies use a plausible positive mass.
 - Output only the schema-conforming WorldSpec.`;
 
-export const WORLD_PROMPT_VERSION = "worldbycode-v0.1.2";
+export const WORLD_PROMPT_VERSION = "worldbycode-v0.1.3";

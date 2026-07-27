@@ -40,6 +40,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
+import Link from "next/link";
 import {
   type MutableRefObject,
   useCallback,
@@ -49,11 +50,7 @@ import {
   useState,
 } from "react";
 import * as THREE from "three";
-import {
-  SAMPLE_WORLD,
-  type WorldObject,
-  type WorldSpec,
-} from "../lib/worldspec";
+import { type WorldObject, type WorldSpec } from "../lib/worldspec";
 import {
   verifyStaticWorld,
   type StaticVerification,
@@ -108,6 +105,8 @@ const stages = [
   ["Compile", "deterministic scene code"],
   ["Verify", "5s local physics run"],
 ] as const;
+
+const INITIAL_DEMO = DEMO_WORLDS[0]!;
 
 function createInitialReport(
   world: WorldSpec,
@@ -249,6 +248,207 @@ function ChairVisual({ object }: { object: WorldObject }) {
   );
 }
 
+function MonitorVisual({ object }: { object: WorldObject }) {
+  const [width, height, depth] = object.size;
+  const screenHeight = height * 0.72;
+  const screenDepth = Math.max(0.035, depth * 0.54);
+  const baseHeight = Math.max(0.018, height * 0.055);
+  const standHeight = height * 0.22;
+
+  return (
+    <group>
+      <RoundedBox
+        args={[width, screenHeight, screenDepth]}
+        radius={Math.min(0.035, height * 0.06)}
+        smoothness={3}
+        position={[0, height * 0.12, 0]}
+        castShadow
+      >
+        <meshStandardMaterial {...materialProps(object)} />
+      </RoundedBox>
+      <mesh position={[0, height * 0.12, screenDepth / 2 + 0.001]}>
+        <planeGeometry args={[width * 0.9, screenHeight * 0.84]} />
+        <meshStandardMaterial color="#182127" roughness={0.28} metalness={0.08} />
+      </mesh>
+      <RoundedBox
+        args={[width * 0.07, standHeight, Math.max(0.025, depth * 0.3)]}
+        radius={0.012}
+        smoothness={2}
+        position={[0, -height * 0.32, 0]}
+        castShadow
+      >
+        <meshStandardMaterial color="#222725" roughness={0.5} metalness={0.18} />
+      </RoundedBox>
+      <RoundedBox
+        args={[width * 0.32, baseHeight, depth]}
+        radius={Math.min(0.012, baseHeight * 0.4)}
+        smoothness={2}
+        position={[0, -height / 2 + baseHeight / 2, 0]}
+        castShadow
+      >
+        <meshStandardMaterial color="#222725" roughness={0.52} metalness={0.18} />
+      </RoundedBox>
+    </group>
+  );
+}
+
+function PlantVisual({ object }: { object: WorldObject }) {
+  const [width, height] = object.size;
+  const potHeight = height * 0.3;
+  const potRadius = width * 0.27;
+  const potY = -height / 2 + potHeight / 2;
+  const isCactus = object.notes.toLowerCase().includes("cactus");
+
+  return (
+    <group>
+      <mesh position={[0, potY, 0]} castShadow>
+        <cylinderGeometry args={[potRadius * 0.82, potRadius, potHeight, 20]} />
+        <meshStandardMaterial {...materialProps(object)} />
+      </mesh>
+      {isCactus ? (
+        <>
+          <mesh position={[0, height * 0.13, 0]} castShadow>
+            <capsuleGeometry args={[width * 0.13, height * 0.44, 7, 14]} />
+            <meshStandardMaterial color="#4f7046" roughness={0.9} />
+          </mesh>
+          <mesh
+            position={[width * 0.16, height * 0.12, 0]}
+            rotation={[0, 0, -0.35]}
+            castShadow
+          >
+            <capsuleGeometry args={[width * 0.08, height * 0.2, 6, 12]} />
+            <meshStandardMaterial color="#587b4c" roughness={0.9} />
+          </mesh>
+        </>
+      ) : (
+        <>
+          <mesh position={[0, -height * 0.04, 0]} castShadow>
+            <cylinderGeometry args={[width * 0.035, width * 0.045, height * 0.42, 10]} />
+            <meshStandardMaterial color="#5a4a31" roughness={0.92} />
+          </mesh>
+          {[
+            [-0.18, 0.07, 0.04, 0.56],
+            [0.16, 0.15, -0.08, 0.5],
+            [-0.04, 0.27, 0.08, 0.58],
+            [0.04, 0.36, -0.02, 0.44],
+          ].map(([x, y, z, scale], index) => (
+            <mesh
+              key={index}
+              position={[width * x, height * y, width * z]}
+              scale={[width * scale, height * scale * 0.64, width * scale]}
+              castShadow
+            >
+              <icosahedronGeometry args={[0.5, 1]} />
+              <meshStandardMaterial
+                color={index % 2 === 0 ? "#476c3e" : "#5d7e4c"}
+                roughness={0.93}
+              />
+            </mesh>
+          ))}
+        </>
+      )}
+    </group>
+  );
+}
+
+function LampVisual({ object }: { object: WorldObject }) {
+  const [width, height] = object.size;
+  const isPendant = object.notes.toLowerCase().includes("pendant");
+
+  if (isPendant) {
+    const shadeHeight = height * 0.34;
+    const cordHeight = height - shadeHeight * 0.72;
+    return (
+      <group>
+        <mesh position={[0, height / 2 - cordHeight / 2, 0]} castShadow>
+          <cylinderGeometry args={[width * 0.018, width * 0.018, cordHeight, 10]} />
+          <meshStandardMaterial color="#29251f" roughness={0.65} metalness={0.2} />
+        </mesh>
+        <mesh position={[0, -height / 2 + shadeHeight / 2, 0]} castShadow>
+          <cylinderGeometry
+            args={[width * 0.18, width * 0.48, shadeHeight, 28, 1, true]}
+          />
+          <meshStandardMaterial {...materialProps(object)} side={THREE.DoubleSide} />
+        </mesh>
+        <mesh position={[0, -height / 2 + shadeHeight * 0.48, 0]}>
+          <sphereGeometry args={[width * 0.07, 14, 10]} />
+          <meshStandardMaterial color="#fff0b8" emissive="#d89832" emissiveIntensity={0.7} />
+        </mesh>
+      </group>
+    );
+  }
+
+  const baseHeight = Math.max(0.025, height * 0.07);
+  return (
+    <group>
+      <mesh position={[0, -height / 2 + baseHeight / 2, 0]} castShadow>
+        <cylinderGeometry args={[width * 0.36, width * 0.42, baseHeight, 20]} />
+        <meshStandardMaterial color="#3b403b" roughness={0.5} metalness={0.25} />
+      </mesh>
+      <mesh position={[-width * 0.08, -height * 0.12, 0]} rotation={[0, 0, -0.22]} castShadow>
+        <cylinderGeometry args={[width * 0.035, width * 0.04, height * 0.58, 10]} />
+        <meshStandardMaterial color="#3b403b" roughness={0.5} metalness={0.25} />
+      </mesh>
+      <mesh position={[width * 0.08, height * 0.22, 0]} rotation={[0, 0, -0.28]} castShadow>
+        <cylinderGeometry args={[width * 0.16, width * 0.3, height * 0.24, 20]} />
+        <meshStandardMaterial {...materialProps(object)} />
+      </mesh>
+    </group>
+  );
+}
+
+function SofaVisual({ object }: { object: WorldObject }) {
+  const [width, height, depth] = object.size;
+  const baseHeight = height * 0.34;
+  const backHeight = height * 0.64;
+  const backDepth = depth * 0.2;
+  const armWidth = Math.min(width * 0.12, 0.18);
+
+  return (
+    <group>
+      <RoundedBox
+        args={[width, baseHeight, depth]}
+        radius={Math.min(0.08, baseHeight * 0.22)}
+        smoothness={4}
+        position={[0, -height / 2 + baseHeight / 2, 0]}
+        castShadow
+      >
+        <meshStandardMaterial {...materialProps(object)} />
+      </RoundedBox>
+      <RoundedBox
+        args={[width - armWidth * 2.1, height * 0.18, depth * 0.7]}
+        radius={Math.min(0.08, height * 0.07)}
+        smoothness={4}
+        position={[0, -height * 0.18, -depth * 0.05]}
+        castShadow
+      >
+        <meshStandardMaterial {...materialProps(object)} />
+      </RoundedBox>
+      <RoundedBox
+        args={[width, backHeight, backDepth]}
+        radius={Math.min(0.08, backDepth * 0.35)}
+        smoothness={4}
+        position={[0, height / 2 - backHeight / 2, depth / 2 - backDepth / 2]}
+        castShadow
+      >
+        <meshStandardMaterial {...materialProps(object)} />
+      </RoundedBox>
+      {[-width / 2 + armWidth / 2, width / 2 - armWidth / 2].map((x) => (
+        <RoundedBox
+          key={x}
+          args={[armWidth, height * 0.56, depth * 0.88]}
+          radius={Math.min(0.07, armWidth * 0.28)}
+          smoothness={3}
+          position={[x, -height * 0.13, 0]}
+          castShadow
+        >
+          <meshStandardMaterial {...materialProps(object)} />
+        </RoundedBox>
+      ))}
+    </group>
+  );
+}
+
 function BottleVisual({ object }: { object: WorldObject }) {
   const [width, height] = object.size;
   const capHeight = Math.min(height * 0.16, 0.05);
@@ -310,11 +510,113 @@ function BagVisual({ object }: { object: WorldObject }) {
   );
 }
 
+function CartonVisual({ object }: { object: WorldObject }) {
+  const [width, height, depth] = object.size;
+  const isOpen = object.notes.toLowerCase().includes("open carton");
+
+  if (!isOpen) {
+    return (
+      <RoundedBox
+        args={object.size}
+        radius={Math.min(0.022, width * 0.12)}
+        smoothness={3}
+        castShadow
+        receiveShadow
+      >
+        <meshStandardMaterial {...materialProps(object)} />
+      </RoundedBox>
+    );
+  }
+
+  const bodyHeight = height * 0.72;
+  const bodyY = -height / 2 + bodyHeight / 2;
+  const flapThickness = Math.max(0.012, height * 0.018);
+
+  return (
+    <group>
+      <RoundedBox
+        args={[width, bodyHeight, depth]}
+        radius={Math.min(0.022, width * 0.08)}
+        smoothness={3}
+        position={[0, bodyY, 0]}
+        castShadow
+        receiveShadow
+      >
+        <meshStandardMaterial {...materialProps(object)} />
+      </RoundedBox>
+      {[-1, 1].map((direction) => (
+        <mesh
+          key={`z-${direction}`}
+          position={[0, height * 0.27, direction * depth * 0.5]}
+          rotation={[direction * -0.52, 0, 0]}
+          castShadow
+        >
+          <boxGeometry args={[width * 0.96, flapThickness, depth * 0.48]} />
+          <meshStandardMaterial {...materialProps(object)} />
+        </mesh>
+      ))}
+      {[-1, 1].map((direction) => (
+        <mesh
+          key={`x-${direction}`}
+          position={[direction * width * 0.5, height * 0.27, 0]}
+          rotation={[0, 0, direction * 0.52]}
+          castShadow
+        >
+          <boxGeometry args={[width * 0.48, flapThickness, depth * 0.92]} />
+          <meshStandardMaterial {...materialProps(object)} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function BookStackVisual({ object }: { object: WorldObject }) {
+  const [width, height, depth] = object.size;
+  const layerHeight = height / 5;
+  const layers = [
+    { scale: 1, color: "#d8ddd8", yaw: -0.035 },
+    { scale: 0.92, color: "#34413d", yaw: 0.025 },
+    { scale: 0.98, color: "#eeeae0", yaw: -0.018 },
+    { scale: 0.9, color: "#41524a", yaw: 0.032 },
+    { scale: 0.8, color: "#9c6a4d", yaw: -0.04 },
+  ];
+
+  return (
+    <group>
+      {layers.map((layer, index) => (
+        <RoundedBox
+          key={layer.color}
+          args={[
+            width * layer.scale,
+            layerHeight * 0.82,
+            depth * (0.9 + layer.scale * 0.1),
+          ]}
+          radius={Math.min(0.012, layerHeight * 0.18)}
+          smoothness={2}
+          position={[0, -height / 2 + layerHeight * (index + 0.5), 0]}
+          rotation={[0, layer.yaw, 0]}
+          castShadow
+        >
+          <meshStandardMaterial color={layer.color} roughness={0.76} />
+        </RoundedBox>
+      ))}
+    </group>
+  );
+}
+
 function ObjectVisual({ object }: { object: WorldObject }) {
   if (object.kind === "table") return <TableVisual object={object} />;
   if (object.kind === "chair") return <ChairVisual object={object} />;
+  if (object.kind === "monitor") return <MonitorVisual object={object} />;
+  if (object.kind === "plant") return <PlantVisual object={object} />;
+  if (object.kind === "lamp") return <LampVisual object={object} />;
+  if (object.kind === "sofa") return <SofaVisual object={object} />;
   if (object.kind === "bottle") return <BottleVisual object={object} />;
   if (object.kind === "bag") return <BagVisual object={object} />;
+  if (object.kind === "carton") return <CartonVisual object={object} />;
+  if (object.notes.toLowerCase().includes("book stack")) {
+    return <BookStackVisual object={object} />;
+  }
 
   if (object.kind === "cylinder") {
     return (
@@ -330,11 +632,7 @@ function ObjectVisual({ object }: { object: WorldObject }) {
   return (
     <RoundedBox
       args={object.size}
-      radius={
-        object.kind === "carton"
-          ? Math.min(0.022, object.size[0] * 0.12)
-          : Math.min(0.035, Math.min(...object.size) * 0.12)
-      }
+      radius={Math.min(0.035, Math.min(...object.size) * 0.12)}
       smoothness={3}
       castShadow
       receiveShadow
@@ -413,6 +711,65 @@ function ObjectColliders({ object }: { object: WorldObject }) {
 
   if (object.kind === "cylinder" || object.kind === "bottle") {
     return <CylinderCollider args={[height / 2, width / 2]} />;
+  }
+
+  if (object.kind === "monitor") {
+    const screenHeight = height * 0.72;
+    const screenDepth = Math.max(0.035, depth * 0.54);
+    const baseHeight = Math.max(0.018, height * 0.055);
+    const standHeight = height * 0.22;
+    return (
+      <>
+        <CuboidCollider
+          args={[width / 2, screenHeight / 2, screenDepth / 2]}
+          position={[0, height * 0.12, 0]}
+        />
+        <CuboidCollider
+          args={[width * 0.035, standHeight / 2, Math.max(0.025, depth * 0.3) / 2]}
+          position={[0, -height * 0.32, 0]}
+        />
+        <CuboidCollider
+          args={[width * 0.16, baseHeight / 2, depth / 2]}
+          position={[0, -height / 2 + baseHeight / 2, 0]}
+        />
+      </>
+    );
+  }
+
+  if (object.kind === "plant") {
+    const potHeight = height * 0.3;
+    return (
+      <CylinderCollider
+        args={[potHeight / 2, width * 0.27]}
+        position={[0, -height / 2 + potHeight / 2, 0]}
+      />
+    );
+  }
+
+  if (object.kind === "sofa") {
+    const baseHeight = height * 0.34;
+    const backHeight = height * 0.64;
+    const backDepth = depth * 0.2;
+    const armWidth = Math.min(width * 0.12, 0.18);
+    return (
+      <>
+        <CuboidCollider
+          args={[width / 2, baseHeight / 2, depth / 2]}
+          position={[0, -height / 2 + baseHeight / 2, 0]}
+        />
+        <CuboidCollider
+          args={[width / 2, backHeight / 2, backDepth / 2]}
+          position={[0, height / 2 - backHeight / 2, depth / 2 - backDepth / 2]}
+        />
+        {[-width / 2 + armWidth / 2, width / 2 - armWidth / 2].map((x) => (
+          <CuboidCollider
+            key={x}
+            args={[armWidth / 2, height * 0.28, depth * 0.44]}
+            position={[x, -height * 0.13, 0]}
+          />
+        ))}
+      </>
+    );
   }
 
   return <CuboidCollider args={[width / 2, height / 2, depth / 2]} />;
@@ -839,9 +1196,9 @@ function formatWorld(world: WorldSpec) {
 export function WorldStudio() {
   const inputRef = useRef<HTMLInputElement>(null);
   const settingsKeyInputRef = useRef<HTMLInputElement>(null);
-  const [world, setWorld] = useState<WorldSpec>(SAMPLE_WORLD);
-  const [previewUrl, setPreviewUrl] = useState("/reference-5608.jpg");
-  const [fileName, setFileName] = useState("IMG_5608.HEIC");
+  const [world, setWorld] = useState<WorldSpec>(INITIAL_DEMO.world);
+  const [previewUrl, setPreviewUrl] = useState(INITIAL_DEMO.reference);
+  const [fileName, setFileName] = useState(INITIAL_DEMO.referenceName);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [worldSource, setWorldSource] = useState<"example" | "generated">(
     "example",
@@ -863,11 +1220,15 @@ export function WorldStudio() {
   const [showColliders, setShowColliders] = useState(false);
   const [sceneKey, setSceneKey] = useState(0);
   const [activeTab, setActiveTab] = useState<DockTab>("spec");
-  const [activeDemoId, setActiveDemoId] = useState<string | null>("dining");
+  const [activeDemoId, setActiveDemoId] = useState<string | null>(
+    INITIAL_DEMO.id,
+  );
   const [dockOpen, setDockOpen] = useState(true);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [report, setReport] = useState(() => createInitialReport(SAMPLE_WORLD));
+  const [report, setReport] = useState(() =>
+    createInitialReport(INITIAL_DEMO.world),
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -1217,10 +1578,10 @@ export function WorldStudio() {
   return (
     <main className="app-shell">
       <header className="topbar">
-        <div className="brand">
+        <Link className="brand studio-brand" href="/" aria-label="WorldByCode home">
           <span className="brand-mark" aria-hidden="true" />
           worldbycode
-        </div>
+        </Link>
         <div className="topbar-process" aria-label="Generation pipeline">
           <span>IMAGE</span>
           <ChevronRight size={11} />
@@ -1306,6 +1667,17 @@ export function WorldStudio() {
               <span className="source-kind">
                 {selectedFile ? "NEW" : activeDemo?.reference ? "PHOTO" : "DEMO"}
               </span>
+              {!selectedFile && activeDemo?.sourceUrl && (
+                <a
+                  className="source-credit"
+                  href={activeDemo.sourceUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={`Open original source · ${activeDemo.credit}`}
+                >
+                  {activeDemo.credit}
+                </a>
+              )}
             </div>
             <div className="source-copy">
               <span>Current source</span>
@@ -1466,7 +1838,8 @@ export function WorldStudio() {
                 }
               >
                 <div className="demo-preview">
-                  <MiniWorldPreview world={demo.world} />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={demo.reference} alt="" />
                 </div>
                 <span
                   className="demo-accent"

@@ -5,6 +5,10 @@ export type WorldObjectKind =
   | "cylinder"
   | "table"
   | "chair"
+  | "monitor"
+  | "plant"
+  | "lamp"
+  | "sofa"
   | "bottle"
   | "carton"
   | "bag";
@@ -126,6 +130,10 @@ export const WORLD_SPEC_JSON_SCHEMA = {
               "cylinder",
               "table",
               "chair",
+              "monitor",
+              "plant",
+              "lamp",
+              "sofa",
               "bottle",
               "carton",
               "bag",
@@ -174,6 +182,10 @@ const kinds = new Set<WorldObjectKind>([
   "cylinder",
   "table",
   "chair",
+  "monitor",
+  "plant",
+  "lamp",
+  "sofa",
   "bottle",
   "carton",
   "bag",
