@@ -76,6 +76,13 @@ export default function Home() {
           <a href="#how-it-works">How it works</a>
           <a href="#worldspec">WorldSpec</a>
           <a href="#open-source">Open source</a>
+          <a
+            href="https://github.com/alvin528/WorldByCode"
+            target="_blank"
+            rel="noreferrer"
+          >
+            GitHub
+          </a>
         </nav>
 
         <a className="landing-nav-cta" href="/demo">
@@ -366,7 +373,13 @@ export default function Home() {
         <div>
           <a href="/demo">Demo</a>
           <a href="#how-it-works">Pipeline</a>
-          <a href="#open-source">Open source</a>
+          <a
+            href="https://github.com/alvin528/WorldByCode"
+            target="_blank"
+            rel="noreferrer"
+          >
+            GitHub
+          </a>
         </div>
       </footer>
     </main>

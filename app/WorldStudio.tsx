@@ -1615,14 +1615,16 @@ export function WorldStudio() {
             </strong>
             <Settings2 size={12} />
           </button>
-          <button
+          <a
             className="icon-button"
-            aria-label="Repository link will be added before public launch"
-            title="Repository link will be added before public launch"
-            disabled
+            href="https://github.com/alvin528/WorldByCode"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Open WorldByCode on GitHub"
+            title="Open WorldByCode on GitHub"
           >
             <GitFork size={15} />
-          </button>
+          </a>
         </div>
       </header>
 

@@ -4,35 +4,52 @@
 
 ### Photo in. World out.
 
-**Turn one image into an editable, inspectable physics world.<br>
-One VLM. Procedural code. Zero 3D generators.**
+**One RGB image → one editable, inspectable physics world.**
 
+A vision-language model writes the scene specification.<br>
+Deterministic code builds the geometry, colliders, and physics.
+
+[![GitHub Stars](https://img.shields.io/github/stars/alvin528/WorldByCode?style=flat-square&color=d8ff3e)](https://github.com/alvin528/WorldByCode/stargazers)
 [![MIT License](https://img.shields.io/badge/license-MIT-d8ff3e?style=flat-square)](LICENSE)
 [![Next.js](https://img.shields.io/badge/Next.js-16-171711?style=flat-square)](https://nextjs.org/)
 [![Three.js](https://img.shields.io/badge/Three.js-procedural-171711?style=flat-square)](https://threejs.org/)
 [![Rapier](https://img.shields.io/badge/Rapier-physics-ff7657?style=flat-square)](https://rapier.rs/)
 [![VLM only](https://img.shields.io/badge/3D_generators-0-8eb7ff?style=flat-square)](#how-it-works)
 
-[Explore examples](#showcase) · [How it works](#how-it-works) · [Quick start](#quick-start) · [WorldSpec](#worldspec) · [Roadmap](#roadmap)
+[See the studio](#live-studio) · [Explore examples](#showcase) · [How it works](#how-it-works) · [Quick start](#quick-start) · [WorldSpec](#worldspec)
 
 </div>
 
-![WorldByCode — one image to an editable physics world](public/og.png)
+![WorldByCode live studio showing the source image, compiled 3D world, physics score, and WorldSpec](public/readme-studio.png)
 
-WorldByCode converts a single RGB image into a compact `WorldSpec`: named
-objects, metric dimensions, support relations, materials, rigid-body types,
-masses, confidence, and uncertainty.
+<p align="center">
+  <sub>One workspace: source image, compiled world, live physics gate, and copyable WorldSpec.</sub>
+</p>
 
-A vision-language model produces the specification. Deterministic React Three
-Fiber code compiles it into procedural geometry, while Rapier builds and tests
-the physics world in the browser.
+WorldByCode converts a single image into a compact `WorldSpec`: named objects,
+metric dimensions, support relations, materials, rigid-body types, masses,
+confidence, and uncertainty. React Three Fiber compiles that specification into
+procedural geometry, while Rapier builds and tests the physics world in the
+browser.
 
-The output is a **program**, not a baked mesh. You can inspect it, copy it,
-diff it, edit it, download it, or compile it into another simulator.
+The primary output is a **small, readable program for a world**, not a baked
+mesh. You can inspect it, copy it, diff it, edit it, download it, or compile it
+into another simulator.
 
 > [!IMPORTANT]
 > WorldByCode does not call an image-to-3D, text-to-3D, NeRF, Gaussian Splatting,
 > or mesh-generation model. The VLM returns strict JSON only.
+
+## At a glance
+
+| | |
+|---|---|
+| **Input** | One RGB image |
+| **Model output** | Strict, schema-validated WorldSpec JSON |
+| **Geometry** | Trusted procedural Three.js components |
+| **Physics** | Rapier rigid bodies, colliders, gravity, and live verification |
+| **Interaction** | Drag objects, reset, inspect colliders, edit or copy JSON |
+| **3D generation models** | None |
 
 ## Why WorldByCode?
 
@@ -49,6 +66,29 @@ optimizes for a usable world.
 | Verification | Visual quality | Live settling, support, overlap, and fall checks |
 | Portability | Asset formats | Small JSON contract plus deterministic compiler |
 
+This makes the output useful for rapid scene prototyping, robotics simulation,
+synthetic-data research, spatial-reasoning experiments, and simulator export.
+
+## Live studio
+
+The studio keeps the evidence in one place:
+
+- a large source image for direct visual comparison;
+- the compiled Three.js world, with movable furniture and props;
+- a live physics score derived from the running Rapier simulation;
+- the complete WorldSpec, ready to copy or download;
+- the exact VLM prompt, model metadata, confidence, and uncertainty;
+- four verified examples that work without an API key.
+
+Run it locally:
+
+```bash
+npm install
+npm run dev
+```
+
+Then open [`http://localhost:3000/demo`](http://localhost:3000/demo).
+
 ## Showcase
 
 Every included example is backed by a licensed photograph and passes the live
@@ -64,15 +104,8 @@ five-second physics gate.
 | <img src="public/demo-cafe.jpg" alt="Café tables and chairs" width="440"> | <img src="public/demo-dining.jpg" alt="Patio dining table and chairs" width="440"> |
 | **13 bodies · 7 dynamic · 100 physics** | **15 bodies · 5 dynamic · 100 physics** |
 
-Open the browser studio at [`/demo`](http://localhost:3000/demo) to:
-
-- drag movable furniture and props;
-- toggle gravity and collider visualization;
-- reset and run the five-second physics gate;
-- compare the source image with the compiled world;
-- inspect or copy the complete WorldSpec;
-- inspect the exact VLM prompt and model metadata;
-- upload a new image with a server key or temporary session key.
+The examples cover cluttered workspaces, small rigid props, occlusion, portrait
+images, movable furniture, and supported tabletop objects.
 
 ## How it works
 
@@ -123,6 +156,8 @@ The model is deliberately constrained:
 Requirements: Node.js 22.13 or newer.
 
 ```bash
+git clone https://github.com/alvin528/WorldByCode.git
+cd WorldByCode
 npm install
 cp .env.example .env.local
 npm run dev
@@ -133,7 +168,8 @@ Open:
 - homepage: `http://localhost:3000`
 - live studio: `http://localhost:3000/demo`
 
-The four included worlds work without an API key.
+The four included worlds work immediately without an API key. Click an example,
+drag a chair or prop, then select **Run demo** to repeat the physics gate.
 
 To generate a new world from an uploaded image, add:
 
@@ -152,6 +188,9 @@ Run the quality checks with:
 npm test
 npm run lint
 ```
+
+No database, GPU runtime, model weights, Blender, or local 3D generator is
+required.
 
 ## Model and prompt
 
