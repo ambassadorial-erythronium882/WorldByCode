@@ -205,6 +205,21 @@ button:focus-visible {
   color: #77746b;
 }
 
+.static-demo-chip {
+  cursor: default;
+}
+
+.static-demo-chip:hover {
+  border-color: var(--line);
+  background: rgba(255, 255, 255, 0.56);
+  transform: none;
+}
+
+.static-demo-chip .dot {
+  background: #80a71a;
+  box-shadow: 0 0 0 3px rgba(128, 167, 26, 0.14);
+}
+
 .experience {
   position: relative;
   display: grid;
@@ -443,6 +458,15 @@ button:focus-visible {
 
 .source-replace:hover {
   background: var(--acid);
+}
+
+.source-replace:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.source-replace:disabled:hover {
+  background: white;
 }
 
 .file-input {
@@ -871,6 +895,12 @@ button:focus-visible {
   background:
     radial-gradient(circle at 72% 12%, rgba(216, 255, 62, 0.22), transparent 36%),
     rgba(20, 22, 17, 0.84);
+}
+
+.upload-card:disabled {
+  cursor: not-allowed;
+  filter: saturate(0.65);
+  opacity: 0.72;
 }
 
 .upload-icon {

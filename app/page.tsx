@@ -14,6 +14,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { DEMO_WORLDS } from "../lib/demo-worlds";
+import { sitePath } from "../lib/site-path";
 
 export const metadata: Metadata = {
   title: "Photo in. World out.",
@@ -85,7 +86,7 @@ export default function Home() {
           </a>
         </nav>
 
-        <a className="landing-nav-cta" href="/demo">
+        <a className="landing-nav-cta" href={sitePath("/demo/")}>
           Open demo
           <ArrowUpRight size={15} />
         </a>
@@ -109,7 +110,10 @@ export default function Home() {
           </p>
 
           <div className="landing-hero-actions">
-            <a className="landing-button landing-button-primary" href="/demo">
+            <a
+              className="landing-button landing-button-primary"
+              href={sitePath("/demo/")}
+            >
               <Play size={16} fill="currentColor" />
               Try the live demo
               <ArrowRight size={16} />
@@ -145,7 +149,10 @@ export default function Home() {
 
           <div className="landing-compare">
             <div className="landing-compare-source">
-              <img src="/demo-office.jpg" alt="Reference home office" />
+              <img
+                src={sitePath("/demo-office.jpg")}
+                alt="Reference home office"
+              />
               <span>01 · REFERENCE</span>
             </div>
             <div className="landing-compare-arrow" aria-hidden="true">
@@ -153,7 +160,7 @@ export default function Home() {
             </div>
             <div className="landing-compare-world">
               <img
-                src="/og.png"
+                src={sitePath("/og.png")}
                 alt="Procedural physics world with visible colliders"
               />
               <span>EXECUTABLE WORLD</span>
@@ -210,7 +217,11 @@ export default function Home() {
             ).length;
 
             return (
-              <a className="landing-case" href="/demo" key={demo.id}>
+              <a
+                className="landing-case"
+                href={sitePath("/demo/")}
+                key={demo.id}
+              >
                 <div className="landing-case-media">
                   <img src={demo.reference} alt={demo.title} />
                   <span className="landing-case-number">{demo.index}</span>
@@ -297,7 +308,7 @@ export default function Home() {
             </li>
           </ul>
 
-          <a className="landing-text-link" href="/demo">
+          <a className="landing-text-link" href={sitePath("/demo/")}>
             Inspect a complete WorldSpec
             <ArrowRight size={16} />
           </a>
@@ -358,7 +369,7 @@ export default function Home() {
           <code>
             <span>$</span> npm run dev
           </code>
-          <a href="/demo">
+          <a href={sitePath("/demo/")}>
             Or try the browser demo first <ArrowUpRight size={14} />
           </a>
         </div>
@@ -371,7 +382,7 @@ export default function Home() {
         </a>
         <p>One image. One editable physics world. Zero 3D generators.</p>
         <div>
-          <a href="/demo">Demo</a>
+          <a href={sitePath("/demo/")}>Demo</a>
           <a href="#how-it-works">Pipeline</a>
           <a
             href="https://github.com/alvin528/WorldByCode"

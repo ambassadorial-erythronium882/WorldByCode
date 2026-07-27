@@ -3,6 +3,7 @@ import type {
   WorldObject,
   WorldSpec,
 } from "./worldspec";
+import { sitePath } from "./site-path";
 
 export interface DemoWorld {
   id: string;
@@ -803,7 +804,7 @@ export const DEMO_WORLDS: DemoWorld[] = [
     category: "Workspace · 20 bodies",
     accent: "#d8ff3e",
     world: dualMonitorDesk,
-    reference: "/demo-office.jpg",
+    reference: sitePath("/demo-office.jpg"),
     referenceName: "dual-monitor-office.jpg",
     credit: "Photo · Annie Spratt",
     sourceUrl:
@@ -817,7 +818,7 @@ export const DEMO_WORLDS: DemoWorld[] = [
     category: "Rigid props · 8 bodies",
     accent: "#ff795d",
     world: packingWorkbench,
-    reference: "/demo-boxes.jpg",
+    reference: sitePath("/demo-boxes.jpg"),
     referenceName: "packing-workbench.jpg",
     credit: "Photo · Kaboompics.com",
     sourceUrl:
@@ -831,7 +832,7 @@ export const DEMO_WORLDS: DemoWorld[] = [
     category: "Occlusion · 13 bodies",
     accent: "#8eb7ff",
     world: cafeCorner,
-    reference: "/demo-cafe.jpg",
+    reference: sitePath("/demo-cafe.jpg"),
     referenceName: "cafe-corner.jpg",
     credit: "Photo · Zulfahmi Al Ridhawi",
     sourceUrl:
@@ -845,7 +846,7 @@ export const DEMO_WORLDS: DemoWorld[] = [
     category: "Portrait view · 15 bodies",
     accent: "#d699ff",
     world: patioDining,
-    reference: "/demo-dining.jpg",
+    reference: sitePath("/demo-dining.jpg"),
     referenceName: "patio-dining.jpg",
     credit: "Photo · Rachel Claire",
     sourceUrl:

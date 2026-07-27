@@ -10,13 +10,14 @@ A vision-language model writes the scene specification.<br>
 Deterministic code builds the geometry, colliders, and physics.
 
 [![GitHub Stars](https://img.shields.io/github/stars/alvin528/WorldByCode?style=flat-square&color=d8ff3e)](https://github.com/alvin528/WorldByCode/stargazers)
+[![Live Demo](https://img.shields.io/badge/live_demo-open-d8ff3e?style=flat-square&logo=github)](https://alvin528.github.io/WorldByCode/)
 [![MIT License](https://img.shields.io/badge/license-MIT-d8ff3e?style=flat-square)](LICENSE)
 [![Next.js](https://img.shields.io/badge/Next.js-16-171711?style=flat-square)](https://nextjs.org/)
 [![Three.js](https://img.shields.io/badge/Three.js-procedural-171711?style=flat-square)](https://threejs.org/)
 [![Rapier](https://img.shields.io/badge/Rapier-physics-ff7657?style=flat-square)](https://rapier.rs/)
 [![VLM only](https://img.shields.io/badge/3D_generators-0-8eb7ff?style=flat-square)](#how-it-works)
 
-[See the studio](#live-studio) · [Explore examples](#showcase) · [How it works](#how-it-works) · [Quick start](#quick-start) · [WorldSpec](#worldspec)
+[Open the live demo](https://alvin528.github.io/WorldByCode/) · [Studio details](#live-studio) · [How it works](#how-it-works) · [Quick start](#quick-start) · [WorldSpec](#worldspec)
 
 </div>
 
@@ -71,6 +72,8 @@ synthetic-data research, spatial-reasoning experiments, and simulator export.
 
 ## Live studio
 
+**[Launch WorldByCode on GitHub Pages →](https://alvin528.github.io/WorldByCode/)**
+
 The studio keeps the evidence in one place:
 
 - a large source image for direct visual comparison;
@@ -79,6 +82,11 @@ The studio keeps the evidence in one place:
 - the complete WorldSpec, ready to copy or download;
 - the exact VLM prompt, model metadata, confidence, and uncertainty;
 - four verified examples that work without an API key.
+
+The public GitHub Pages build includes the complete homepage, all four
+interactive examples, movable objects, WorldSpec inspection, and the live
+physics gate. Because GitHub Pages is static hosting, generating from a new
+uploaded image requires the local or self-hosted API route described below.
 
 Run it locally:
 
@@ -286,6 +294,9 @@ app/
 ├── demo/page.tsx         # full interactive studio
 ├── WorldStudio.tsx       # compiler UI, Three.js scene, Rapier runtime
 └── api/world/route.ts    # OpenAI Responses API proxy
+github-pages/
+├── index.html            # static entry and social metadata
+└── main.tsx              # homepage/demo client entry
 lib/
 ├── demo-worlds.ts        # licensed verified examples
 ├── physics-verifier.ts   # static support and overlap checks
@@ -293,6 +304,8 @@ lib/
 └── worldspec.ts          # contract, JSON Schema, local validation
 public/
 └── demo-*.jpg            # stable source references
+.github/workflows/
+└── deploy-pages.yml      # automatic GitHub Pages deployment
 ```
 
 ## Current scope

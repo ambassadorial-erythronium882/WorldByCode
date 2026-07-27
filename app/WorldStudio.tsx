@@ -40,7 +40,6 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import Link from "next/link";
 import {
   type MutableRefObject,
   useCallback,
@@ -60,6 +59,7 @@ import {
   WORLD_PROMPT_VERSION,
 } from "../lib/world-prompt";
 import { DEMO_WORLDS, type DemoWorld } from "../lib/demo-worlds";
+import { PUBLIC_STATIC_DEMO, sitePath } from "../lib/site-path";
 
 type StageState = "done" | "active" | "waiting";
 type DockTab = "spec" | "report" | "prompt";
@@ -76,6 +76,14 @@ interface ApiStatus {
   mode: "live" | "example";
   byokAllowed?: boolean;
 }
+
+const STATIC_API_STATUS: ApiStatus = {
+  configured: false,
+  model: "gpt-5.6",
+  promptVersion: WORLD_PROMPT_VERSION,
+  mode: "example",
+  byokAllowed: false,
+};
 
 interface GenerationMetadata {
   provider: string;
@@ -1203,7 +1211,9 @@ export function WorldStudio() {
   const [worldSource, setWorldSource] = useState<"example" | "generated">(
     "example",
   );
-  const [apiStatus, setApiStatus] = useState<ApiStatus | null>(null);
+  const [apiStatus, setApiStatus] = useState<ApiStatus | null>(
+    PUBLIC_STATIC_DEMO ? STATIC_API_STATUS : null,
+  );
   const [sessionApiKey, setSessionApiKey] = useState("");
   const [sessionModel, setSessionModel] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -1231,6 +1241,10 @@ export function WorldStudio() {
   );
 
   useEffect(() => {
+    if (PUBLIC_STATIC_DEMO) {
+      return;
+    }
+
     let cancelled = false;
     const savedKey = window.sessionStorage.getItem(SESSION_API_KEY) ?? "";
     const savedModel = window.sessionStorage.getItem(SESSION_MODEL) ?? "";
@@ -1244,7 +1258,7 @@ export function WorldStudio() {
       }
     });
 
-    fetch("/api/world")
+    fetch(sitePath("/api/world"))
       .then(async (response) => {
         if (!response.ok) throw new Error("API status unavailable.");
         return (await response.json()) as ApiStatus;
@@ -1361,7 +1375,10 @@ export function WorldStudio() {
       headers.set("x-worldbycode-model", settingsModel.trim());
     }
     try {
-      const response = await fetch("/api/world", { method: "PUT", headers });
+      const response = await fetch(sitePath("/api/world"), {
+        method: "PUT",
+        headers,
+      });
       const payload = (await response.json()) as {
         ok?: boolean;
         error?: string;
@@ -1458,7 +1475,7 @@ export function WorldStudio() {
     headers.set("x-worldbycode-model", effectiveModel);
 
     try {
-      const response = await fetch("/api/world", {
+      const response = await fetch(sitePath("/api/world"), {
         method: "POST",
         headers,
         body: formData,
@@ -1578,10 +1595,14 @@ export function WorldStudio() {
   return (
     <main className="app-shell">
       <header className="topbar">
-        <Link className="brand studio-brand" href="/" aria-label="WorldByCode home">
+        <a
+          className="brand studio-brand"
+          href={sitePath("/")}
+          aria-label="WorldByCode home"
+        >
           <span className="brand-mark" aria-hidden="true" />
           worldbycode
-        </Link>
+        </a>
         <div className="topbar-process" aria-label="Generation pipeline">
           <span>IMAGE</span>
           <ChevronRight size={11} />
@@ -1594,27 +1615,38 @@ export function WorldStudio() {
             <Sparkles size={11} />
             zero 3d generators
           </span>
-          <button
-            className={`mini-chip api-chip ${effectiveApiConfigured ? "live-chip" : ""}`}
-            onClick={openSettings}
-            title={
-              activeCredentialMode === "session"
-                ? "Using a temporary key saved for this browser tab."
-                : activeCredentialMode === "server"
-                  ? "Using the API key configured on the server."
-                  : "Connect an API key to generate worlds from new images."
-            }
-          >
-            <span className="dot" />
-            <strong>
-              {activeCredentialMode === "session"
-                ? "session api"
-                : activeCredentialMode === "server"
-                  ? "live api"
-                  : "connect api"}
-            </strong>
-            <Settings2 size={12} />
-          </button>
+          {PUBLIC_STATIC_DEMO ? (
+            <span
+              className="mini-chip api-chip static-demo-chip"
+              title="The public Pages build runs the four verified examples. Self-host the API route to generate from new images."
+            >
+              <span className="dot" />
+              <strong>public demo</strong>
+              <ShieldCheck size={12} />
+            </span>
+          ) : (
+            <button
+              className={`mini-chip api-chip ${effectiveApiConfigured ? "live-chip" : ""}`}
+              onClick={openSettings}
+              title={
+                activeCredentialMode === "session"
+                  ? "Using a temporary key saved for this browser tab."
+                  : activeCredentialMode === "server"
+                    ? "Using the API key configured on the server."
+                    : "Connect an API key to generate worlds from new images."
+              }
+            >
+              <span className="dot" />
+              <strong>
+                {activeCredentialMode === "session"
+                  ? "session api"
+                  : activeCredentialMode === "server"
+                    ? "live api"
+                    : "connect api"}
+              </strong>
+              <Settings2 size={12} />
+            </button>
+          )}
           <a
             className="icon-button"
             href="https://github.com/alvin528/WorldByCode"
@@ -1695,7 +1727,17 @@ export function WorldStudio() {
             <button
               className="source-replace"
               onClick={triggerUpload}
-              aria-label="Choose a new source image"
+              disabled={PUBLIC_STATIC_DEMO}
+              aria-label={
+                PUBLIC_STATIC_DEMO
+                  ? "Image upload requires a self-hosted API"
+                  : "Choose a new source image"
+              }
+              title={
+                PUBLIC_STATIC_DEMO
+                  ? "Clone the repository and configure the API route to generate a new world."
+                  : "Choose a new source image"
+              }
             >
               <Upload size={14} />
             </button>
@@ -1704,6 +1746,7 @@ export function WorldStudio() {
               className="file-input"
               type="file"
               accept="image/png,image/jpeg,image/webp,.heic,.heif"
+              disabled={PUBLIC_STATIC_DEMO}
               onChange={(event) => handleFile(event.target.files?.[0])}
             />
           </div>
@@ -1852,13 +1895,26 @@ export function WorldStudio() {
                 <span className="demo-category">{demo.category}</span>
               </button>
             ))}
-            <button className="demo-card upload-card" onClick={triggerUpload}>
+            <button
+              className="demo-card upload-card"
+              onClick={triggerUpload}
+              disabled={PUBLIC_STATIC_DEMO}
+              title={
+                PUBLIC_STATIC_DEMO
+                  ? "Self-host WorldByCode with an API route to generate from a new image."
+                  : "Build a new world from your image"
+              }
+            >
               <span className="upload-icon">
                 <Upload size={16} />
               </span>
               <span className="demo-index">05</span>
               <span className="demo-title">Your image</span>
-              <span className="demo-category">Build a new world</span>
+              <span className="demo-category">
+                {PUBLIC_STATIC_DEMO
+                  ? "Self-host to generate"
+                  : "Build a new world"}
+              </span>
             </button>
           </div>
           </div>
@@ -1941,7 +1997,7 @@ export function WorldStudio() {
         </div>
       </section>
 
-      {settingsOpen && (
+      {settingsOpen && !PUBLIC_STATIC_DEMO && (
         <div
           className="settings-backdrop"
           onMouseDown={(event) => {
