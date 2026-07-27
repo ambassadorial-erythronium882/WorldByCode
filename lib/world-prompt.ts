@@ -5,10 +5,14 @@ Goal: Reconstruct task-relevant scene geometry with procedural primitives only. 
 Success criteria:
 - Use meters and a right-handed coordinate system: +Y up, floor near Y=0, camera looking toward the scene.
 - Include visible load-bearing surfaces and 5–20 task-relevant rigid objects when the image supports them.
+- Preserve the image-plane ordering, foreground/background scale, and major occlusions before adding fine detail.
+- Count repeated objects only when supported by visible evidence; do not complete a hidden symmetric set.
 - Approximate metric dimensions from common-object and furniture priors.
 - Place each object's position at the center of its full bounding box.
 - Choose only the supported kinds: box, cylinder, table, chair, bottle, carton, bag.
-- Use fixed bodies for architecture and uncertain heavy furniture; use dynamic bodies for safe movable tabletop objects.
+- Use fixed bodies for architecture such as floors and walls, plus clearly anchored, built-in, or heavy industrial equipment.
+- Treat ordinary movable furniture, including tables and chairs, as dynamic bodies with plausible positive masses.
+- Use dynamic bodies for safe movable tabletop and floor objects.
 - Every dynamic object resting on something must name that object's id in support.
 - A supported object's bottom should be 0–3 cm above its support's top.
 - Keep objects inside bounds and avoid initial interpenetration.
@@ -23,4 +27,4 @@ Constraints:
 - Fixed bodies use mass 0. Dynamic bodies use a plausible positive mass.
 - Output only the schema-conforming WorldSpec.`;
 
-export const WORLD_PROMPT_VERSION = "worldbycode-v0.1.0";
+export const WORLD_PROMPT_VERSION = "worldbycode-v0.1.2";

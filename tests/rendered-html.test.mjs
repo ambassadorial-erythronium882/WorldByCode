@@ -40,13 +40,19 @@ test("server-renders the WorldByCode studio", async () => {
     html,
     /<title>Image to executable physics world · WorldByCode<\/title>/i,
   );
-  assert.match(html, /One photo\. A world that survives/);
+  assert.match(html, /Photo in\./);
+  assert.match(html, /World out\./);
+  assert.match(html, /An editable 3D physics scene/);
   assert.match(html, /zero 3d generators/i);
+  assert.match(html, /connect api/i);
   assert.match(html, /Verifying physics/);
   assert.match(html, /WorldSpec/);
+  assert.match(html, /Copy JSON/);
   assert.match(html, /Physics report/);
   assert.match(html, /VLM prompt/);
-  assert.match(html, /Three\.js \+ Rapier/);
+  assert.match(html, /Packing station/);
+  assert.match(html, /Fulfillment lane/);
+  assert.match(html, /Your image/);
 });
 
 test("ships the generated social card and no starter preview", async () => {
@@ -77,6 +83,8 @@ test("ships an inspectable WorldSpec contract and real model route", async () =>
   assert.match(worldSpecSource, /validateWorldSpec/);
   assert.match(promptSource, /Real2Sim scene compiler/);
   assert.match(routeSource, /api\.openai\.com\/v1\/responses/);
+  assert.match(routeSource, /api\.openai\.com\/v1\/models/);
+  assert.match(routeSource, /x-worldbycode-api-key/);
   assert.match(routeSource, /type: "json_schema"/);
   assert.match(routeSource, /detail: "original"/);
   assert.match(envExample, /OPENAI_API_KEY=/);

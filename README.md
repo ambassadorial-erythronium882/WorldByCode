@@ -15,20 +15,28 @@ downloadable, and measurable.
 ## What works now
 
 - A real server-side image-to-`WorldSpec` API using OpenAI Responses.
+- An in-product API Settings panel with server-key and temporary BYOK modes,
+  model overrides, and a connection test.
 - Strict Structured Outputs plus a second local validation pass.
 - A deterministic compiler for boxes, cylinders, tables, chairs, bottles,
   cartons, and bags.
-- Side-by-side source image and live 3D comparison.
+- A full-canvas 3D stage with compact source, tool, and physics overlays.
+- Four switchable showcase worlds with live 3D thumbnails and verified
+  five-second physics runs.
 - Drag, gravity, collider inspection, reset, and a five-second Rapier run.
+- Fixed architectural shells with movable everyday furniture and props.
 - Measured settle time and fallen-body count from the live simulation.
 - Computed support geometry and initial AABB overlap checks.
 - A downloadable `WorldSpec`, visible versioned VLM prompt, and transparent
   model metadata.
-- An included verified example that works without an API key.
+- A default-visible, copy-ready `WorldSpec` panel for taking the JSON into
+  another tool or project.
+- Included verified examples that work without an API key.
 
 The interface never pretends that a newly selected image has been generated.
-Without a server API key it stays in **example mode**, labels the current scene
-as unchanged, and disables live generation.
+Without an active API connection it stays in **example mode** and labels the
+current scene as unchanged. Click **Connect API** to use a key for the current
+browser tab, or configure a server key for a shared deployment.
 
 ## Deliberate scope
 
@@ -97,6 +105,12 @@ Add an OpenAI API key to `.env.local` to enable new-image generation:
 OPENAI_API_KEY=your_server_side_key
 OPENAI_WORLD_MODEL=gpt-5.6
 ```
+
+Alternatively, open **Connect API** in the app and add a temporary key. That
+key is kept in `sessionStorage`, sent only to the same-origin `/api/world`
+proxy, and removed when the tab session ends or when **Clear session key** is
+used. It is never written into the generated WorldSpec. A server-side key is
+the recommended setup for public deployments.
 
 Then open `http://localhost:3000`.
 

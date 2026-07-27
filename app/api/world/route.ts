@@ -10,6 +10,9 @@ import {
 
 const DEFAULT_MODEL = "gpt-5.6";
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const API_KEY_HEADER = "x-worldbycode-api-key";
+const MODEL_HEADER = "x-worldbycode-model";
+const MODEL_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._:-]{1,79}$/;
 const ACCEPTED_IMAGE_TYPES = new Set([
   "image/jpeg",
   "image/png",
@@ -34,6 +37,26 @@ interface OpenAIResponse {
 
 function configuredModel() {
   return process.env.OPENAI_WORLD_MODEL?.trim() || DEFAULT_MODEL;
+}
+
+function requestApiKey(request: Request) {
+  const sessionKey = request.headers.get(API_KEY_HEADER)?.trim();
+  const serverKey = process.env.OPENAI_API_KEY?.trim();
+  return {
+    apiKey: sessionKey || serverKey || "",
+    credentialMode: sessionKey ? "session" : serverKey ? "server" : "none",
+  };
+}
+
+function requestModel(request: Request) {
+  const candidate = request.headers.get(MODEL_HEADER)?.trim();
+  if (!candidate) return configuredModel();
+  if (!MODEL_PATTERN.test(candidate)) {
+    throw new Error(
+      "Model names may contain letters, numbers, dots, colons, underscores, and hyphens.",
+    );
+  }
+  return candidate;
 }
 
 function extractOutputText(response: OpenAIResponse): string | null {
@@ -67,16 +90,81 @@ export async function GET() {
     model: configuredModel(),
     promptVersion: WORLD_PROMPT_VERSION,
     mode: process.env.OPENAI_API_KEY ? "live" : "example",
+    byokAllowed: true,
   });
 }
 
-export async function POST(request: Request) {
-  const apiKey = process.env.OPENAI_API_KEY;
+export async function PUT(request: Request) {
+  const { apiKey, credentialMode } = requestApiKey(request);
   if (!apiKey) {
     return Response.json(
       {
         error:
-          "Live generation is not configured. Add OPENAI_API_KEY on the server or keep using the included verified example.",
+          "No API key is available. Add a session key or configure OPENAI_API_KEY on the server.",
+        code: "API_KEY_MISSING",
+      },
+      { status: 400 },
+    );
+  }
+
+  let model: string;
+  try {
+    model = requestModel(request);
+  } catch (error) {
+    return Response.json(
+      {
+        error: error instanceof Error ? error.message : "Invalid model name.",
+        code: "MODEL_INVALID",
+      },
+      { status: 400 },
+    );
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20_000);
+  try {
+    const response = await fetch("https://api.openai.com/v1/models", {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: controller.signal,
+    });
+    const payload = (await response.json().catch(() => ({}))) as OpenAIResponse;
+    if (!response.ok) {
+      return Response.json(
+        {
+          error:
+            payload.error?.message ||
+            `OpenAI rejected the connection with status ${response.status}.`,
+          code: "CONNECTION_REJECTED",
+        },
+        { status: response.status },
+      );
+    }
+    return Response.json({
+      ok: true,
+      credentialMode,
+      model,
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error && error.name === "AbortError"
+        ? "The connection test timed out."
+        : "OpenAI could not be reached from this server.";
+    return Response.json(
+      { error: message, code: "CONNECTION_FAILED" },
+      { status: 502 },
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export async function POST(request: Request) {
+  const { apiKey, credentialMode } = requestApiKey(request);
+  if (!apiKey) {
+    return Response.json(
+      {
+        error:
+          "Live generation is not configured. Connect a temporary key in Settings or add OPENAI_API_KEY on the server.",
         code: "API_KEY_MISSING",
       },
       { status: 503 },
@@ -117,7 +205,18 @@ export async function POST(request: Request) {
     );
   }
 
-  const model = configuredModel();
+  let model: string;
+  try {
+    model = requestModel(request);
+  } catch (error) {
+    return Response.json(
+      {
+        error: error instanceof Error ? error.message : "Invalid model name.",
+        code: "MODEL_INVALID",
+      },
+      { status: 400 },
+    );
+  }
   const base64 = bufferToBase64(await file.arrayBuffer());
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 120_000);
@@ -234,6 +333,7 @@ export async function POST(request: Request) {
       generation: {
         provider: "openai",
         model: payload.model || model,
+        credentialMode,
         responseId: payload.id || null,
         promptVersion: WORLD_PROMPT_VERSION,
         usage: payload.usage || null,

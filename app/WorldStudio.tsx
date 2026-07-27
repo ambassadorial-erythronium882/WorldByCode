@@ -17,20 +17,25 @@ import {
 } from "@react-three/rapier";
 import {
   AlertTriangle,
-  ArrowLeftRight,
   Check,
   ChevronRight,
   Clipboard,
   Code2,
   Download,
+  Eye,
+  EyeOff,
   FileImage,
   GitFork,
+  KeyRound,
   LoaderCircle,
   MousePointer2,
   Orbit,
   Play,
   RefreshCcw,
   ScanLine,
+  Server,
+  Settings2,
+  ShieldCheck,
   Sparkles,
   Upload,
   X,
@@ -57,21 +62,28 @@ import {
   WORLD_GENERATION_PROMPT,
   WORLD_PROMPT_VERSION,
 } from "../lib/world-prompt";
+import { DEMO_WORLDS, type DemoWorld } from "../lib/demo-worlds";
 
 type StageState = "done" | "active" | "waiting";
 type DockTab = "spec" | "report" | "prompt";
 type VerificationPhase = "verifying" | "passed" | "warning" | "paused";
+type ConnectionState = "idle" | "testing" | "success" | "error";
+
+const SESSION_API_KEY = "worldbycode:session-api-key";
+const SESSION_MODEL = "worldbycode:session-model";
 
 interface ApiStatus {
   configured: boolean;
   model: string;
   promptVersion: string;
   mode: "live" | "example";
+  byokAllowed?: boolean;
 }
 
 interface GenerationMetadata {
   provider: string;
   model: string;
+  credentialMode?: "server" | "session";
   responseId: string | null;
   promptVersion: string;
   usage: {
@@ -369,6 +381,10 @@ function ObjectColliders({ object }: { object: WorldObject }) {
     const seatY = -height / 2 + height * 0.5;
     const backHeight = height * 0.5;
     const backDepth = Math.min(0.09, depth * 0.17);
+    const legHeight = Math.max(0.08, seatY + height / 2);
+    const legWidth = Math.min(0.04, width * 0.08);
+    const legX = width / 2 - legWidth * 1.6;
+    const legZ = depth / 2 - legWidth * 1.6;
     return (
       <>
         <CuboidCollider
@@ -379,6 +395,18 @@ function ObjectColliders({ object }: { object: WorldObject }) {
           args={[width / 2, backHeight / 2, backDepth / 2]}
           position={[0, height / 2 - backHeight / 2, depth / 2 - backDepth / 2]}
         />
+        {[
+          [-legX, -height / 2 + legHeight / 2, -legZ],
+          [legX, -height / 2 + legHeight / 2, -legZ],
+          [-legX, -height / 2 + legHeight / 2, legZ],
+          [legX, -height / 2 + legHeight / 2, legZ],
+        ].map((position, index) => (
+          <CuboidCollider
+            key={index}
+            args={[legWidth / 2, legHeight / 2, legWidth / 2]}
+            position={position as [number, number, number]}
+          />
+        ))}
       </>
     );
   }
@@ -394,13 +422,16 @@ function CompiledBody({
   object,
   gravityOn,
   onRegister,
+  onInteractionChange,
 }: {
   object: WorldObject;
   gravityOn: boolean;
   onRegister: (id: string, body: RapierRigidBody | null) => void;
+  onInteractionChange: (active: boolean) => void;
 }) {
   const body = useRef<RapierRigidBody>(null);
   const [dragging, setDragging] = useState(false);
+  const [hovered, setHovered] = useState(false);
   const dragPlane = useRef(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0));
   const dragHeight = useRef(object.position[1]);
   const hit = useMemo(() => new THREE.Vector3(), []);
@@ -424,9 +455,11 @@ function CompiledBody({
       body.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
       body.current.setGravityScale(0, true);
       (event.target as Element).setPointerCapture?.(event.pointerId);
+      document.body.style.cursor = "grabbing";
+      onInteractionChange(true);
       setDragging(true);
     },
-    [object.body],
+    [object.body, onInteractionChange],
   );
 
   const moveDrag = useCallback(
@@ -449,9 +482,19 @@ function CompiledBody({
       event.stopPropagation();
       body.current.setGravityScale(gravityOn ? 1 : 0, true);
       (event.target as Element).releasePointerCapture?.(event.pointerId);
+      document.body.style.cursor = hovered ? "grab" : "default";
+      onInteractionChange(false);
       setDragging(false);
     },
-    [gravityOn, object.body],
+    [gravityOn, hovered, object.body, onInteractionChange],
+  );
+
+  useEffect(
+    () => () => {
+      document.body.style.cursor = "default";
+      onInteractionChange(false);
+    },
+    [onInteractionChange],
   );
 
   return (
@@ -475,16 +518,30 @@ function CompiledBody({
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
         onPointerOver={() => {
-          if (object.body === "dynamic") document.body.style.cursor = "grab";
+          if (object.body === "dynamic") {
+            setHovered(true);
+            document.body.style.cursor = dragging ? "grabbing" : "grab";
+          }
         }}
         onPointerOut={() => {
-          if (!dragging) document.body.style.cursor = "default";
+          setHovered(false);
+          if (!dragging) {
+            document.body.style.cursor = "default";
+          }
         }}
       >
         <ObjectVisual object={object} />
-        {dragging && (
-          <Html center position={[0, object.size[1] * 0.75, 0]}>
-            <span className="object-label">moving · {object.label}</span>
+        {(hovered || dragging) && object.body === "dynamic" && (
+          <Html
+            center
+            position={[0, object.size[1] * 0.78, 0]}
+            style={{ pointerEvents: "none" }}
+            zIndexRange={[30, 0]}
+          >
+            <span className={`object-label ${dragging ? "dragging" : ""}`}>
+              <span className="object-label-dot" />
+              {dragging ? "Moving" : "Drag"} · {object.label}
+            </span>
           </Html>
         )}
       </group>
@@ -609,6 +666,7 @@ function WorldScene({
   onReport: (report: RuntimeReport) => void;
 }) {
   const bodies = useRef(new Map<string, RapierRigidBody>());
+  const [interactionLocked, setInteractionLocked] = useState(false);
   const maxGroundSpan = Math.max(world.bounds[0], world.bounds[2], 4);
   const registerBody = useCallback(
     (id: string, body: RapierRigidBody | null) => {
@@ -653,6 +711,7 @@ function WorldScene({
             object={object}
             gravityOn={gravityOn}
             onRegister={registerBody}
+            onInteractionChange={setInteractionLocked}
           />
         ))}
         <RuntimeVerifier
@@ -683,11 +742,48 @@ function WorldScene({
       />
       <OrbitControls
         makeDefault
+        enabled={!interactionLocked}
         target={world.camera.target}
         minDistance={1.2}
         maxDistance={Math.max(10, maxGroundSpan * 1.8)}
         maxPolarAngle={Math.PI / 2.02}
         enableDamping
+      />
+    </Canvas>
+  );
+}
+
+function MiniWorldPreview({ world }: { world: WorldSpec }) {
+  return (
+    <Canvas
+      frameloop="demand"
+      dpr={1}
+      camera={{
+        position: world.camera.position,
+        fov: world.camera.fov,
+        near: 0.1,
+        far: 60,
+      }}
+    >
+      <color attach="background" args={["#d9d9d3"]} />
+      <ambientLight intensity={1.35} />
+      <directionalLight position={[4, 7, 5]} intensity={2.1} />
+      {world.objects
+        .filter((object) => !object.id.includes("wall"))
+        .map((object) => (
+          <group
+            key={object.id}
+            position={object.position}
+            rotation={object.rotation}
+          >
+            <ObjectVisual object={object} />
+          </group>
+        ))}
+      <OrbitControls
+        target={world.camera.target}
+        enablePan={false}
+        enableZoom={false}
+        enableRotate={false}
       />
     </Canvas>
   );
@@ -742,6 +838,7 @@ function formatWorld(world: WorldSpec) {
 
 export function WorldStudio() {
   const inputRef = useRef<HTMLInputElement>(null);
+  const settingsKeyInputRef = useRef<HTMLInputElement>(null);
   const [world, setWorld] = useState<WorldSpec>(SAMPLE_WORLD);
   const [previewUrl, setPreviewUrl] = useState("/reference-5608.jpg");
   const [fileName, setFileName] = useState("IMG_5608.HEIC");
@@ -750,27 +847,55 @@ export function WorldStudio() {
     "example",
   );
   const [apiStatus, setApiStatus] = useState<ApiStatus | null>(null);
+  const [sessionApiKey, setSessionApiKey] = useState("");
+  const [sessionModel, setSessionModel] = useState("");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsKey, setSettingsKey] = useState("");
+  const [settingsModel, setSettingsModel] = useState("");
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [connectionState, setConnectionState] =
+    useState<ConnectionState>("idle");
+  const [connectionMessage, setConnectionMessage] = useState("");
   const [generation, setGeneration] = useState<GenerationMetadata | null>(null);
   const [currentStage, setCurrentStage] = useState(3);
   const [isBuilding, setIsBuilding] = useState(true);
   const [gravityOn, setGravityOn] = useState(true);
   const [showColliders, setShowColliders] = useState(false);
-  const [compareOn, setCompareOn] = useState(true);
   const [sceneKey, setSceneKey] = useState(0);
   const [activeTab, setActiveTab] = useState<DockTab>("spec");
+  const [activeDemoId, setActiveDemoId] = useState<string | null>("dining");
+  const [dockOpen, setDockOpen] = useState(true);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [report, setReport] = useState(() => createInitialReport(SAMPLE_WORLD));
 
   useEffect(() => {
     let cancelled = false;
+    const savedKey = window.sessionStorage.getItem(SESSION_API_KEY) ?? "";
+    const savedModel = window.sessionStorage.getItem(SESSION_MODEL) ?? "";
+    window.queueMicrotask(() => {
+      if (cancelled) return;
+      setSessionApiKey(savedKey);
+      setSettingsKey(savedKey);
+      if (savedModel) {
+        setSessionModel(savedModel);
+        setSettingsModel(savedModel);
+      }
+    });
+
     fetch("/api/world")
       .then(async (response) => {
         if (!response.ok) throw new Error("API status unavailable.");
         return (await response.json()) as ApiStatus;
       })
       .then((status) => {
-        if (!cancelled) setApiStatus(status);
+        if (!cancelled) {
+          setApiStatus(status);
+          if (!savedModel) {
+            setSessionModel(status.model);
+            setSettingsModel(status.model);
+          }
+        }
       })
       .catch(() => {
         if (!cancelled) {
@@ -779,7 +904,12 @@ export function WorldStudio() {
             model: "gpt-5.6",
             promptVersion: WORLD_PROMPT_VERSION,
             mode: "example",
+            byokAllowed: true,
           });
+          if (!savedModel) {
+            setSessionModel("gpt-5.6");
+            setSettingsModel("gpt-5.6");
+          }
         }
       });
     return () => {
@@ -793,6 +923,106 @@ export function WorldStudio() {
     },
     [previewUrl],
   );
+
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const focusTimer = window.setTimeout(
+      () => settingsKeyInputRef.current?.focus(),
+      80,
+    );
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSettingsOpen(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.clearTimeout(focusTimer);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [settingsOpen]);
+
+  const effectiveModel =
+    sessionModel.trim() || apiStatus?.model || "gpt-5.6";
+  const effectiveApiConfigured = Boolean(
+    sessionApiKey.trim() || apiStatus?.configured,
+  );
+  const activeCredentialMode = sessionApiKey.trim()
+    ? "session"
+    : apiStatus?.configured
+      ? "server"
+      : "none";
+
+  const openSettings = useCallback(() => {
+    setSettingsKey(sessionApiKey);
+    setSettingsModel(sessionModel || apiStatus?.model || "gpt-5.6");
+    setConnectionState("idle");
+    setConnectionMessage("");
+    setShowApiKey(false);
+    setSettingsOpen(true);
+  }, [apiStatus?.model, sessionApiKey, sessionModel]);
+
+  const saveApiSettings = () => {
+    const nextKey = settingsKey.trim();
+    const nextModel =
+      settingsModel.trim() || apiStatus?.model || "gpt-5.6";
+    setSessionApiKey(nextKey);
+    setSessionModel(nextModel);
+    if (nextKey) window.sessionStorage.setItem(SESSION_API_KEY, nextKey);
+    else window.sessionStorage.removeItem(SESSION_API_KEY);
+    window.sessionStorage.setItem(SESSION_MODEL, nextModel);
+    setError(null);
+    setSettingsOpen(false);
+  };
+
+  const clearSessionKey = () => {
+    setSettingsKey("");
+    setSessionApiKey("");
+    window.sessionStorage.removeItem(SESSION_API_KEY);
+    setConnectionState("idle");
+    setConnectionMessage("");
+  };
+
+  const testApiConnection = async () => {
+    if (!settingsKey.trim() && !apiStatus?.configured) {
+      setConnectionState("error");
+      setConnectionMessage("Enter an API key to test this connection.");
+      return;
+    }
+    setConnectionState("testing");
+    setConnectionMessage("Checking OpenAI access…");
+    const headers = new Headers();
+    if (settingsKey.trim()) {
+      headers.set("x-worldbycode-api-key", settingsKey.trim());
+    }
+    if (settingsModel.trim()) {
+      headers.set("x-worldbycode-model", settingsModel.trim());
+    }
+    try {
+      const response = await fetch("/api/world", { method: "PUT", headers });
+      const payload = (await response.json()) as {
+        ok?: boolean;
+        error?: string;
+        credentialMode?: "server" | "session";
+        model?: string;
+      };
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error || "The connection could not be verified.");
+      }
+      setConnectionState("success");
+      setConnectionMessage(
+        `${payload.credentialMode === "session" ? "Session" : "Server"} key connected. ${payload.model || settingsModel} is selected.`,
+      );
+    } catch (connectionError) {
+      setConnectionState("error");
+      setConnectionMessage(
+        connectionError instanceof Error
+          ? connectionError.message
+          : "The connection could not be verified.",
+      );
+    }
+  };
 
   const handleReport = useCallback((nextReport: RuntimeReport) => {
     setReport(nextReport);
@@ -812,6 +1042,22 @@ export function WorldStudio() {
     [gravityOn, world],
   );
 
+  const selectDemo = useCallback(
+    (demo: DemoWorld) => {
+      if (previewUrl.startsWith("blob:")) URL.revokeObjectURL(previewUrl);
+      setWorld(demo.world);
+      setPreviewUrl(demo.reference ?? "");
+      setFileName(demo.referenceName);
+      setSelectedFile(null);
+      setWorldSource("example");
+      setGeneration(null);
+      setError(null);
+      setActiveDemoId(demo.id);
+      resetVerification(demo.world);
+    },
+    [previewUrl, resetVerification],
+  );
+
   const handleFile = useCallback(
     (file?: File) => {
       if (!file) return;
@@ -819,6 +1065,8 @@ export function WorldStudio() {
       setPreviewUrl(URL.createObjectURL(file));
       setFileName(file.name);
       setSelectedFile(file);
+      setActiveDemoId(null);
+      setGeneration(null);
       setError(null);
       setCurrentStage(0);
       setIsBuilding(false);
@@ -833,10 +1081,8 @@ export function WorldStudio() {
       resetVerification(world);
       return;
     }
-    if (!apiStatus?.configured) {
-      setError(
-        "This deployment is in honest example mode. Configure OPENAI_API_KEY on the server to generate a new world.",
-      );
+    if (!effectiveApiConfigured) {
+      openSettings();
       return;
     }
 
@@ -844,10 +1090,16 @@ export function WorldStudio() {
     setCurrentStage(0);
     const formData = new FormData();
     formData.set("image", selectedFile);
+    const headers = new Headers();
+    if (sessionApiKey.trim()) {
+      headers.set("x-worldbycode-api-key", sessionApiKey.trim());
+    }
+    headers.set("x-worldbycode-model", effectiveModel);
 
     try {
       const response = await fetch("/api/world", {
         method: "POST",
+        headers,
         body: formData,
       });
       const payload = (await response.json()) as {
@@ -867,6 +1119,7 @@ export function WorldStudio() {
       setWorld(payload.world);
       setGeneration(payload.generation ?? null);
       setWorldSource("generated");
+      setActiveDemoId(null);
       setReport(createInitialReport(payload.world, gravityOn));
       setSceneKey((value) => value + 1);
       window.requestAnimationFrame(() => setCurrentStage(3));
@@ -879,7 +1132,16 @@ export function WorldStudio() {
       setCurrentStage(0);
       setIsBuilding(false);
     }
-  }, [apiStatus?.configured, gravityOn, resetVerification, selectedFile, world]);
+  }, [
+    effectiveApiConfigured,
+    effectiveModel,
+    gravityOn,
+    openSettings,
+    resetVerification,
+    selectedFile,
+    sessionApiKey,
+    world,
+  ]);
 
   const stageState = (index: number): StageState => {
     if (index < currentStage) return "done";
@@ -888,6 +1150,10 @@ export function WorldStudio() {
   };
 
   const specText = useMemo(() => formatWorld(world), [world]);
+  const activeDemo = useMemo(
+    () => DEMO_WORLDS.find((demo) => demo.id === activeDemoId) ?? null,
+    [activeDemoId],
+  );
   const currentDockText =
     activeTab === "spec"
       ? specText
@@ -928,15 +1194,25 @@ export function WorldStudio() {
     }
   };
 
+  const openDock = (tab: DockTab) => {
+    setActiveTab(tab);
+    setDockOpen(true);
+  };
+
+  const triggerUpload = () => {
+    if (inputRef.current) inputRef.current.value = "";
+    inputRef.current?.click();
+  };
+
   const buildButtonLabel = isBuilding
     ? currentStage < 2
       ? "Reading image with VLM…"
       : "Verifying physics…"
     : selectedFile
-      ? apiStatus?.configured
+      ? effectiveApiConfigured
         ? "Build this world"
-        : "API key required for this image"
-      : "Re-run verified example";
+        : "Connect API"
+      : "Run demo";
 
   return (
     <main className="app-shell">
@@ -945,24 +1221,39 @@ export function WorldStudio() {
           <span className="brand-mark" aria-hidden="true" />
           worldbycode
         </div>
+        <div className="topbar-process" aria-label="Generation pipeline">
+          <span>IMAGE</span>
+          <ChevronRight size={11} />
+          <span>WORLDSPEC</span>
+          <ChevronRight size={11} />
+          <span>PHYSICS</span>
+        </div>
         <div className="topbar-actions">
-          <span className="mini-chip">
+          <span className="mini-chip desktop-chip">
             <Sparkles size={11} />
             zero 3d generators
           </span>
-          <span
-            className={`mini-chip ${apiStatus?.configured ? "live-chip" : ""}`}
+          <button
+            className={`mini-chip api-chip ${effectiveApiConfigured ? "live-chip" : ""}`}
+            onClick={openSettings}
             title={
-              apiStatus?.configured
-                ? "New uploads use the live model API."
-                : "The included example is interactive; new images need a server API key."
+              activeCredentialMode === "session"
+                ? "Using a temporary key saved for this browser tab."
+                : activeCredentialMode === "server"
+                  ? "Using the API key configured on the server."
+                  : "Connect an API key to generate worlds from new images."
             }
           >
             <span className="dot" />
             <strong>
-              {apiStatus?.configured ? "live api" : "example mode"}
+              {activeCredentialMode === "session"
+                ? "session api"
+                : activeCredentialMode === "server"
+                  ? "live api"
+                  : "connect api"}
             </strong>
-          </span>
+            <Settings2 size={12} />
+          </button>
           <button
             className="icon-button"
             aria-label="Repository link will be added before public launch"
@@ -974,309 +1265,493 @@ export function WorldStudio() {
         </div>
       </header>
 
-      <section className="studio">
-        <aside className="sidebar">
-          <div className="eyebrow">Executable scene reconstruction</div>
-          <h1>
-            One photo. A world that survives{" "}
-            <span className="accent-word">gravity.</span>
-          </h1>
-          <p className="intro">
-            A VLM writes strict WorldSpec. Deterministic code builds every
-            primitive. Rapier decides whether the result is physically valid.
-          </p>
+      <section
+        className={`experience ${dockOpen ? "with-code" : ""}`}
+        aria-label="Interactive physics studio"
+      >
+        <div className="stage-area">
+          <div className="scene-layer">
+          <WorldScene
+            key={`${world.id}-${sceneKey}`}
+            world={world}
+            gravityOn={gravityOn}
+            showColliders={showColliders}
+            sceneKey={sceneKey}
+            onReport={handleReport}
+          />
+          </div>
+          <div className="stage-shade" aria-hidden="true" />
 
-          <div className="input-card">
-            <div className="reference-frame">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={previewUrl} alt="Current reference" />
-              <span className="reference-label">
-                {selectedFile ? "New reference" : "Verified example"}
-              </span>
-            </div>
-            <div className="input-copy">
-              <strong>{fileName}</strong>
-              <span>
-                {selectedFile
-                  ? apiStatus?.configured
-                    ? `${apiStatus.model} · original image detail`
-                    : "Selected locally · not sent or generated"
-                  : "Real vision snapshot · procedural compiler"}
-              </span>
-              <div className="input-actions">
-                <input
-                  ref={inputRef}
-                  className="file-input"
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  onChange={(event) => handleFile(event.target.files?.[0])}
-                />
-                <button
-                  className="small-button"
-                  onClick={() => inputRef.current?.click()}
-                >
-                  <Upload size={11} />
-                  Replace
-                </button>
-                {selectedFile && (
-                  <button
-                    className="small-button"
-                    onClick={() => {
-                      if (previewUrl.startsWith("blob:")) {
-                        URL.revokeObjectURL(previewUrl);
-                      }
-                      setPreviewUrl("/reference-5608.jpg");
-                      setFileName("IMG_5608.HEIC");
-                      setSelectedFile(null);
-                      setWorld(SAMPLE_WORLD);
-                      setWorldSource("example");
-                      setGeneration(null);
-                      setError(null);
-                      resetVerification(SAMPLE_WORLD);
-                    }}
-                  >
-                    <X size={11} />
-                    Example
-                  </button>
-                )}
-              </div>
-            </div>
+          <aside className="hero-card">
+          <div className="hero-copy">
+            <div className="eyebrow">Image-conditioned simulator</div>
+            <h1>
+              Photo in.
+              <br />
+              <span className="accent-word">World out.</span>
+            </h1>
+            <p className="intro">
+              An editable 3D physics scene, built entirely from code.
+            </p>
           </div>
 
-          {error && (
-            <div className="error-banner" role="alert">
-              <AlertTriangle size={14} />
-              <span>{error}</span>
-            </div>
-          )}
-
-          <button
-            className="main-button"
-            onClick={runBuild}
-            disabled={isBuilding || Boolean(selectedFile && !apiStatus?.configured)}
-          >
-            {isBuilding ? (
-              <LoaderCircle className="spinner" size={15} />
-            ) : (
-              <Play size={14} fill="currentColor" />
-            )}
-            {buildButtonLabel}
-            {!isBuilding && <ChevronRight size={14} />}
-          </button>
-
-          <div className="pipeline">
-            <div className="section-label">
-              <span>Build pipeline</span>
-              <span>
-                {generation?.model ||
-                  apiStatus?.model ||
-                  "checking model configuration"}
+          <div className="source-card">
+            <div className="source-preview">
+              {previewUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={previewUrl} alt="Current source image" />
+              ) : (
+                <MiniWorldPreview world={world} />
+              )}
+              <span className="source-kind">
+                {selectedFile ? "NEW" : activeDemo?.reference ? "PHOTO" : "DEMO"}
               </span>
             </div>
-            <div className="stage-list">
-              {stages.map(([name, detail], index) => {
+            <div className="source-copy">
+              <span>Current source</span>
+              <strong>{fileName}</strong>
+              <small>
+                {selectedFile
+                  ? effectiveApiConfigured
+                    ? `${effectiveModel} ready`
+                    : "Connect API to build"
+                  : `${world.objects.length} bodies · ${report.dynamicBodies} dynamic`}
+              </small>
+            </div>
+            <button
+              className="source-replace"
+              onClick={triggerUpload}
+              aria-label="Choose a new source image"
+            >
+              <Upload size={14} />
+            </button>
+            <input
+              ref={inputRef}
+              className="file-input"
+              type="file"
+              accept="image/png,image/jpeg,image/webp,.heic,.heif"
+              onChange={(event) => handleFile(event.target.files?.[0])}
+            />
+          </div>
+
+          <div className="hero-actions">
+            <button
+              className="main-button"
+              onClick={runBuild}
+              disabled={isBuilding}
+            >
+              {isBuilding ? (
+                <LoaderCircle className="spinner" size={15} />
+              ) : (
+                <Play size={14} fill="currentColor" />
+              )}
+              <span>{buildButtonLabel}</span>
+              {!isBuilding && <ChevronRight size={14} />}
+            </button>
+
+            <div className="pipeline-inline" aria-label="Build progress">
+              {stages.map(([name], index) => {
                 const state = stageState(index);
                 return (
-                  <div className={`stage ${state}`} key={name}>
-                    <span className="stage-number">
-                      {state === "done" ? <Check size={11} /> : `0${index + 1}`}
+                  <div className={`pipeline-step ${state}`} key={name}>
+                    <span>
+                      {state === "done" ? <Check size={9} /> : index + 1}
                     </span>
-                    <span className="stage-name">
-                      {name}
-                      <span className="stage-detail">{detail}</span>
-                    </span>
-                    <span className="stage-state">
-                      {state === "done"
-                        ? "passed"
-                        : state === "active"
-                          ? "running"
-                          : "queued"}
-                    </span>
+                    <small>{name}</small>
                   </div>
                 );
               })}
             </div>
-          </div>
 
-          <footer className="sidebar-foot">
-            <span>Three.js + Rapier</span>
-            <span>{WORLD_PROMPT_VERSION}</span>
-          </footer>
-        </aside>
-
-        <section className="workspace" aria-label="Interactive physics viewport">
-          <div className={`comparison-stage ${compareOn ? "split" : ""}`}>
-            {compareOn && (
-              <div className="reference-pane">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={previewUrl} alt="Reference for visual comparison" />
-                <span className="pane-label">
-                  Reference · {selectedFile ? "pending/new" : "source"}
-                </span>
+            {error && (
+              <div className="error-banner" role="alert">
+                <AlertTriangle size={13} />
+                <span>{error}</span>
               </div>
             )}
-            <div className="scene-pane">
-              <WorldScene
-                world={world}
-                gravityOn={gravityOn}
-                showColliders={showColliders}
-                sceneKey={sceneKey}
-                onReport={handleReport}
-              />
-              <span className="pane-label live-pane-label">
-                Compiled world · live
-              </span>
-              {selectedFile && worldSource === "example" && (
-                <div className="stale-scene-banner">
-                  Still showing the included example — the new image has not
-                  been generated.
-                </div>
-              )}
-            </div>
           </div>
-
-          <div className="viewport-header">
-            <div className="viewport-title">
-              <span
-                className={`live-dot ${report.phase === "warning" ? "warning" : ""}`}
-              />
-              {world.id} ·{" "}
-              {worldSource === "generated" ? "API generated" : "verified example"}
-            </div>
-            <div className="viewport-tools">
-              <button
-                className={`tool-button ${compareOn ? "active" : ""}`}
-                onClick={() => setCompareOn((value) => !value)}
-                aria-pressed={compareOn}
-              >
-                <ArrowLeftRight size={13} />
-                <span>Compare</span>
-              </button>
-              <button
-                className={`tool-button ${gravityOn ? "active" : ""}`}
-                onClick={toggleGravity}
-                aria-pressed={gravityOn}
-                aria-label={`Turn gravity ${gravityOn ? "off" : "on"}`}
-              >
-                <Orbit size={13} />
-                <span>Gravity {gravityOn ? "on" : "off"}</span>
-              </button>
-              <button
-                className={`tool-button ${showColliders ? "active" : ""}`}
-                onClick={() => setShowColliders((value) => !value)}
-                aria-pressed={showColliders}
-              >
-                <Code2 size={13} />
-                <span>Colliders</span>
-              </button>
-              <button
-                className="icon-button"
-                onClick={() => resetVerification()}
-                aria-label="Reset and verify physics scene"
-              >
-                <RefreshCcw size={14} />
-              </button>
-            </div>
-          </div>
-
-          <aside className={`score-card ${report.phase}`}>
-            <div className="score-top">
-              <span>Measured physics</span>
-              <strong>{report.score ?? "—"}</strong>
-            </div>
-            <div className="score-bar">
-              <span style={{ width: `${report.score ?? 0}%` }} />
-            </div>
-            <div className="score-checks">
-              <div>
-                {report.settled ? <Check size={10} /> : <LoaderCircle size={10} />}
-                {report.settleTime
-                  ? `settled in ${report.settleTime.toFixed(2)}s`
-                  : report.phase === "paused"
-                    ? "verification paused"
-                    : `measuring ${Math.min(report.elapsed, 5).toFixed(1)}/5.0s`}
-              </div>
-              <div>
-                {report.initialOverlapCount === 0 ? (
-                  <Check size={10} />
-                ) : (
-                  <AlertTriangle size={10} />
-                )}
-                {report.initialOverlapCount} initial AABB overlaps
-              </div>
-              <div>
-                {report.supportValid === report.supportTotal ? (
-                  <Check size={10} />
-                ) : (
-                  <AlertTriangle size={10} />
-                )}
-                {report.supportValid}/{report.supportTotal} dynamic supports valid
-              </div>
-            </div>
           </aside>
 
-          <div className="code-dock">
-            <div className="code-topbar">
-              <div className="tabs">
-                <button
-                  className={`tab-button ${activeTab === "spec" ? "active" : ""}`}
-                  onClick={() => setActiveTab("spec")}
-                >
-                  WorldSpec
-                </button>
-                <button
-                  className={`tab-button ${activeTab === "report" ? "active" : ""}`}
-                  onClick={() => setActiveTab("report")}
-                >
-                  Physics report
-                </button>
-                <button
-                  className={`tab-button ${activeTab === "prompt" ? "active" : ""}`}
-                  onClick={() => setActiveTab("prompt")}
-                >
-                  VLM prompt
-                </button>
-              </div>
-              <div className="code-actions">
-                <button onClick={copyDock} aria-label="Copy active output">
-                  {copied ? <Check size={13} /> : <Clipboard size={13} />}
-                </button>
-                <button onClick={downloadSpec} aria-label="Download WorldSpec">
-                  <Download size={13} />
-                </button>
-              </div>
-            </div>
-            <div className="code-body">
-              <pre>{currentDockText}</pre>
-              <div className="report-summary">
-                <div>
-                  source <strong>{worldSource}</strong>
-                </div>
-                <div>
-                  model{" "}
-                  <strong>
-                    {generation?.model || apiStatus?.model || "checking"}
-                  </strong>
-                </div>
-                <div>
-                  rigid bodies <strong>{world.objects.length}</strong>
-                </div>
-                <div>
-                  dynamic <strong>{report.dynamicBodies}</strong>
-                </div>
-              </div>
-            </div>
+          <div className="viewport-tools">
+          <button
+            className={`tool-button ${gravityOn ? "active" : ""}`}
+            onClick={toggleGravity}
+            aria-pressed={gravityOn}
+            aria-label={`Turn gravity ${gravityOn ? "off" : "on"}`}
+          >
+            <Orbit size={14} />
+            <span>Gravity</span>
+          </button>
+          <button
+            className={`tool-button ${showColliders ? "active" : ""}`}
+            onClick={() => setShowColliders((value) => !value)}
+            aria-pressed={showColliders}
+            aria-label="Toggle collider visualization"
+          >
+            <Code2 size={14} />
+            <span>Colliders</span>
+          </button>
+          <button
+            className="tool-button"
+            onClick={() => resetVerification()}
+            aria-label="Reset and verify physics scene"
+          >
+            <RefreshCcw size={14} />
+            <span>Reset</span>
+          </button>
+          <button
+            className={`tool-button ${dockOpen ? "active" : ""}`}
+            onClick={() => (dockOpen ? setDockOpen(false) : openDock("spec"))}
+            aria-expanded={dockOpen}
+            aria-label="Open WorldSpec panel"
+          >
+            <Code2 size={14} />
+            <span>WorldSpec</span>
+          </button>
           </div>
 
-          <div className="sr-only">
-            <MousePointer2 size={12} />
-            Drag dynamic objects to test physics.
-            <FileImage size={12} />
-            New uploads never change the scene until generation succeeds.
-            <ScanLine size={12} />
+          <aside className={`physics-card ${report.phase}`}>
+          <div className="physics-score">
+            <span>PHYSICS</span>
+            <strong>{report.score ?? "··"}</strong>
           </div>
-        </section>
+          <div className="physics-state">
+            <span className="live-dot" />
+            {report.phase === "verifying"
+              ? `${Math.min(report.elapsed, 5).toFixed(1)}s test`
+              : report.phase === "paused"
+                ? "paused"
+                : report.phase}
+          </div>
+          <div className="physics-meter">
+            <span style={{ width: `${report.score ?? report.elapsed * 18}%` }} />
+          </div>
+          <div className="physics-meta">
+            <span>{report.fallenBodies} fallen</span>
+            <span>
+              {report.supportValid}/{report.supportTotal} supports
+            </span>
+          </div>
+          </aside>
+
+          <div className="scene-caption">
+          <span className="live-dot" />
+          <strong>{world.id.replaceAll("_", " ")}</strong>
+          <span>
+            {worldSource === "generated" ? "API generated" : "live compiled"}
+          </span>
+          </div>
+
+          {selectedFile && worldSource === "example" && (
+            <div className="stale-scene-banner">
+              Preview selected. Build it to replace the current world.
+            </div>
+          )}
+
+          <div className="demo-rail" aria-label="Showcase worlds">
+          <div className="demo-rail-label">
+            <span>LIVE WORLDS</span>
+            <strong>Choose a scene</strong>
+          </div>
+          <div className="demo-track">
+            {DEMO_WORLDS.map((demo) => (
+              <button
+                className={`demo-card ${activeDemoId === demo.id ? "active" : ""}`}
+                key={demo.id}
+                onClick={() => selectDemo(demo)}
+                style={
+                  activeDemoId === demo.id
+                    ? { borderColor: demo.accent }
+                    : undefined
+                }
+              >
+                <div className="demo-preview">
+                  <MiniWorldPreview world={demo.world} />
+                </div>
+                <span
+                  className="demo-accent"
+                  style={{ backgroundColor: demo.accent }}
+                />
+                <span className="demo-index">{demo.index}</span>
+                <span className="demo-title">{demo.title}</span>
+                <span className="demo-category">{demo.category}</span>
+              </button>
+            ))}
+            <button className="demo-card upload-card" onClick={triggerUpload}>
+              <span className="upload-icon">
+                <Upload size={16} />
+              </span>
+              <span className="demo-index">05</span>
+              <span className="demo-title">Your image</span>
+              <span className="demo-category">Build a new world</span>
+            </button>
+          </div>
+          </div>
+        </div>
+
+        <div className={`code-drawer ${dockOpen ? "open" : ""}`}>
+          <div className="code-topbar">
+            <div className="tabs">
+              <button
+                className={`tab-button ${activeTab === "spec" ? "active" : ""}`}
+                onClick={() => openDock("spec")}
+              >
+                WorldSpec
+              </button>
+              <button
+                className={`tab-button ${activeTab === "report" ? "active" : ""}`}
+                onClick={() => openDock("report")}
+              >
+                Physics report
+              </button>
+              <button
+                className={`tab-button ${activeTab === "prompt" ? "active" : ""}`}
+                onClick={() => openDock("prompt")}
+              >
+                VLM prompt
+              </button>
+            </div>
+            <div className="code-actions">
+              <button
+                className="copy-action"
+                onClick={copyDock}
+                aria-label="Copy active output"
+              >
+                {copied ? <Check size={13} /> : <Clipboard size={13} />}
+                <span>
+                  {copied
+                    ? "Copied"
+                    : activeTab === "spec"
+                      ? "Copy JSON"
+                      : "Copy"}
+                </span>
+              </button>
+              <button onClick={downloadSpec} aria-label="Download WorldSpec">
+                <Download size={13} />
+              </button>
+              <button
+                onClick={() => setDockOpen(false)}
+                aria-label="Close source panel"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          </div>
+          <div className="code-body">
+            <pre>{currentDockText}</pre>
+            <div className="report-summary">
+              <div>
+                source <strong>{worldSource}</strong>
+              </div>
+              <div>
+                model{" "}
+                <strong>{generation?.model || effectiveModel}</strong>
+              </div>
+              <div>
+                bodies <strong>{world.objects.length}</strong>
+              </div>
+              <div>
+                dynamic <strong>{report.dynamicBodies}</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="sr-only">
+          <MousePointer2 size={12} />
+          Drag dynamic objects to test physics.
+          <FileImage size={12} />
+          New uploads never change the scene until generation succeeds.
+          <ScanLine size={12} />
+        </div>
       </section>
+
+      {settingsOpen && (
+        <div
+          className="settings-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setSettingsOpen(false);
+          }}
+        >
+          <section
+            className="settings-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="api-settings-title"
+          >
+            <header className="settings-header">
+              <div className="settings-title">
+                <span className="settings-icon">
+                  <Settings2 size={17} />
+                </span>
+                <div>
+                  <span>SETTINGS</span>
+                  <h2 id="api-settings-title">Connect the vision API</h2>
+                </div>
+              </div>
+              <button
+                className="settings-close"
+                onClick={() => setSettingsOpen(false)}
+                aria-label="Close API settings"
+              >
+                <X size={16} />
+              </button>
+            </header>
+
+            <p className="settings-intro">
+              Use the project&apos;s server connection, or bring a temporary
+              OpenAI key for this browser tab.
+            </p>
+
+            <div
+              className={`server-connection ${apiStatus?.configured ? "connected" : ""}`}
+            >
+              <span className="server-icon">
+                <Server size={16} />
+              </span>
+              <div>
+                <span>Server environment</span>
+                <strong>
+                  {apiStatus?.configured
+                    ? "OPENAI_API_KEY is connected"
+                    : "No server key configured"}
+                </strong>
+              </div>
+              <span className="connection-badge">
+                {apiStatus?.configured ? (
+                  <>
+                    <Check size={11} />
+                    ready
+                  </>
+                ) : (
+                  "optional"
+                )}
+              </span>
+            </div>
+
+            <div className="settings-divider">
+              <span>SESSION OVERRIDE</span>
+            </div>
+
+            <label className="settings-field">
+              <span className="settings-label">
+                <KeyRound size={13} />
+                OpenAI API key
+              </span>
+              <div className="secret-input">
+                <input
+                  ref={settingsKeyInputRef}
+                  type={showApiKey ? "text" : "password"}
+                  value={settingsKey}
+                  onChange={(event) => {
+                    setSettingsKey(event.target.value);
+                    setConnectionState("idle");
+                    setConnectionMessage("");
+                  }}
+                  placeholder={
+                    apiStatus?.configured
+                      ? "Leave blank to use the server key"
+                      : "sk-..."
+                  }
+                  autoComplete="off"
+                  spellCheck={false}
+                  aria-label="Temporary OpenAI API key"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowApiKey((value) => !value)}
+                  aria-label={showApiKey ? "Hide API key" : "Show API key"}
+                >
+                  {showApiKey ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+              <small>
+                Saved only for this tab and sent through the same-origin API
+                proxy. It is never added to WorldSpec.
+              </small>
+            </label>
+
+            <label className="settings-field">
+              <span className="settings-label">
+                <Sparkles size={13} />
+                Vision model
+              </span>
+              <input
+                className="model-input"
+                value={settingsModel}
+                onChange={(event) => {
+                  setSettingsModel(event.target.value);
+                  setConnectionState("idle");
+                  setConnectionMessage("");
+                }}
+                placeholder={apiStatus?.model || "gpt-5.6"}
+                autoComplete="off"
+                spellCheck={false}
+              />
+              <small>
+                Defaults to the project model. Custom compatible model aliases
+                are supported.
+              </small>
+            </label>
+
+            <div className="security-note">
+              <ShieldCheck size={15} />
+              <span>
+                For a public deployment, a server-side key is still the safest
+                default. Session mode is intended for local and self-hosted use.
+              </span>
+            </div>
+
+            {connectionMessage && (
+              <div
+                className={`connection-feedback ${connectionState}`}
+                aria-live="polite"
+              >
+                {connectionState === "testing" ? (
+                  <LoaderCircle className="spinner" size={14} />
+                ) : connectionState === "success" ? (
+                  <Check size={14} />
+                ) : (
+                  <AlertTriangle size={14} />
+                )}
+                <span>{connectionMessage}</span>
+              </div>
+            )}
+
+            <footer className="settings-actions">
+              <div>
+                {sessionApiKey && (
+                  <button
+                    className="clear-key-button"
+                    onClick={clearSessionKey}
+                  >
+                    Clear session key
+                  </button>
+                )}
+              </div>
+              <div className="settings-primary-actions">
+                <button
+                  className="test-connection-button"
+                  onClick={testApiConnection}
+                  disabled={connectionState === "testing"}
+                >
+                  {connectionState === "testing"
+                    ? "Testing…"
+                    : "Test connection"}
+                </button>
+                <button
+                  className="save-connection-button"
+                  onClick={saveApiSettings}
+                  disabled={!settingsKey.trim() && !apiStatus?.configured}
+                >
+                  Use connection
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+            </footer>
+          </section>
+        </div>
+      )}
     </main>
   );
 }
